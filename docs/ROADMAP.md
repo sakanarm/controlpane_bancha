@@ -47,7 +47,7 @@
 | 0.6 | LDAP (ถ้ามี) | ⏳ | host, base DN, bind user |
 | 0.7 | เปลี่ยน OpenMetadata ไปใช้ **bot account** แทน account ส่วนตัว | ⏳ | bot token จาก OM (Settings → Bots) |
 | 0.8 | ขึ้น Git: https://github.com/sakanarm/controlpane_bancha | ✅ | branch `main` |
-| 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ⬜ | ยืนยันจากเจ้าของก่อน |
+| 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ✅ | 14 Oct 2026, bind 127.0.0.1 เข้าผ่าน SSH tunnel จนกว่าจะมี nginx (0.10) |
 | 0.10 | nginx location `/Bancha` | ⏳ | ไฟล์ nginx เป็นของ root และใช้ร่วมกับแอพอื่น ต้องให้เจ้าของ server อนุมัติและทำให้ (ไฟล์ตัวอย่างอยู่ใน HANDOFF) |
 | 0.11 | ให้หน้าอื่น (Overview, Users & groups, App registry, Distribution) ใช้ข้อมูลจริง | ⬜ | ตอนนี้ยังเป็น sample data ต้องรอ Phase 1 (DB) และ 0.3 (Azure AD) |
 | 0.12 | Login จริง | ⬜ | ตอนนี้เป็นการเลือก sample account ทำจริงได้หลัง 0.3 หรือใช้ auth-service `/auth/verify` (0.4) |

@@ -23,7 +23,7 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 | Login | ยังเป็น prototype: รหัสอะไรก็ได้ หรือเลือก sample account |
 | DB ของ Bancha | ยังไม่มี (`db/schema.sql` เป็นแค่ร่าง) |
 | Git | อยู่บน https://github.com/sakanarm/controlpane_bancha branch `main` |
-| Prod | ยังไม่ได้ deploy |
+| Prod | Deploy แล้ว 14 Oct 2026: pm2 ชื่อ `bancha` (id 13), `127.0.0.1:3950`, `pm2 save` แล้ว ยังไม่มี nginx จึงเข้าผ่าน SSH tunnel เท่านั้น |
 
 ### ผลการต่อจริง (13 Oct 2026)
 
@@ -34,7 +34,7 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 | `employees-sample` (10.6.150.110:5432/employees) | ⏳ ไม่มี password | port เปิดอยู่ทั้งจาก local และ prod |
 | `dtp-iprm` (10.6.150.102:55432/iprm) | ⏳ ไม่มี password + ต่อไม่ได้ | port ปิดทั้งจาก local และ prod ต้องเปิด firewall |
 | `mfec-entra` (Azure AD) | ⏳ ไม่มี app registration | |
-| `mfec-auth-service` (127.0.0.1:3900) | ⏳ ไม่มี API key | ฟังแค่ loopback บน prod จึงต่อจาก local ไม่ได้ (ECONNREFUSED เป็นเรื่องปกติ) |
+| `mfec-auth-service` (127.0.0.1:3900) | 🟡 health ผ่านจาก prod | ยังไม่มี API key จึงดูได้แค่ `/auth/health` บน local จะขึ้น ECONNREFUSED เพราะฟังแค่ loopback |
 
 รายการของที่ต้องขอเพิ่มอยู่ใน `docs/ROADMAP.md` หัวข้อ Phase 0
 
@@ -112,7 +112,7 @@ npm start                 # http://127.0.0.1:3950/
 - Arak ใช้ Entra tenant ของ MFEC และ auth-service กลางอยู่แล้ว (ดูจากชื่อ key ใน `.env.example` ของ Arak เท่านั้น ไม่ได้เปิดอ่าน secret)
 - nginx: `/etc/nginx/sites-enabled/unified-proxy` include `/etc/nginx/snippets/apps-locations.conf` เป็นของ root และใช้ร่วมกับทุกแอพ TLS hostname คือ `dmhub.mfec.dev`
 
-### Deploy ครั้งแรก (ยังไม่ได้ทำ ต้องได้รับอนุมัติก่อน)
+### Deploy ครั้งแรก (ทำแล้ว 14 Oct 2026)
 
 ```bash
 ssh appadm@10.4.155.151

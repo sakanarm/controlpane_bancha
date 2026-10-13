@@ -23,7 +23,7 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 | Login | ยังเป็น prototype: รหัสอะไรก็ได้ หรือเลือก sample account |
 | DB ของ Bancha | ยังไม่มี (`db/schema.sql` เป็นแค่ร่าง) |
 | Git | อยู่บน https://github.com/sakanarm/controlpane_bancha branch `main` |
-| Prod | Deploy แล้ว 14 Oct 2026: pm2 ชื่อ `bancha` (id 13), `127.0.0.1:3950`, `pm2 save` แล้ว ยังไม่มี nginx จึงเข้าผ่าน SSH tunnel เท่านั้น |
+| Prod | Deploy แล้ว 14 Oct 2026: pm2 ชื่อ `bancha` (id 13), `BIND_HOST=0.0.0.0` เข้าได้ที่ http://10.4.155.151:3950/ (แบบเดียวกับ Arak ที่ :8090) `pm2 save` แล้ว ยังไม่มี nginx `/Bancha` |
 
 ### ผลการต่อจริง (13 Oct 2026)
 

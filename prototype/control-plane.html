@@ -822,21 +822,20 @@ const match = (q, ...fields) => !q || fields.join(' ').toLowerCase().includes(q.
 
 /* ───────────── Nav ───────────── */
 function navHTML(){
-  const att = attention().filter(a => a.tone !== 'mute').length;
   const failing = CONNS.filter(isFailing).length;
   const due = CONNS.filter(c => c.test.ok && secretAge(c) > 90).length;
   const dead = DLV.filter(d => d.status === 'dead').length, retrying = DLV.filter(d => d.status === 'retrying').length;
   const la = liveApps(), active = la.filter(a => a.status === 'active').length, other = la.length - active;
   const items = [
-    ['overview','Overview','home', `Feed seq ${fmt(SEQ)}`, att ? ['warn', att] : null],
+    ['overview','Overview','home', `Feed seq ${fmt(SEQ)}`, null],
     ['identity','Users & groups','users', '1,284 users · 46 groups', null],
-    ['connections','Connections','plug', `${CONNS.length} connections · ${failing} failing`, failing ? ['bad', failing] : due ? ['warn', due] : null],
-    ['apps','App registry','server', `${active} active${other ? ' · ' + other + ' in transition' : ''} · contract v1`, other ? ['warn', other] : null],
-    ['sync','Distribution','send', `${dead} dead letter · ${retrying} retrying`, dead ? ['bad', dead] : retrying ? ['warn', retrying] : null],
+    ['connections','Connections','plug', `${CONNS.length} connections · ${failing} failing`, failing ? ['bad', failing, `${failing} connection${failing === 1 ? '' : 's'} failing the test`] : due ? ['warn', due, `${due} secret${due === 1 ? '' : 's'} older than 90 days, rotate soon`] : null],
+    ['apps','App registry','server', `${active} active${other ? ' · ' + other + ' in transition' : ''} · contract v1`, other ? ['warn', other, `${other} app${other === 1 ? '' : 's'} not active yet`] : null],
+    ['sync','Distribution','send', `${dead} dead letter · ${retrying} retrying`, dead ? ['bad', dead, `${dead} deliver${dead === 1 ? 'y' : 'ies'} in dead letter. Open Distribution and press Retry to clear`] : retrying ? ['warn', retrying, `${retrying} deliver${retrying === 1 ? 'y' : 'ies'} retrying`] : null],
   ];
   const u = me(), admin = isAdmin(u), acc = userAccess(u), nAcc = Object.keys(acc).length;
-  const card = ([id, title, icn, sub, badge]) => `<button class="navcard" id="nav-${id}" data-act="nav" data-page="${id}" title="${esc(sub)}" ${state.page === id ? 'aria-current="page"' : ''}>
-    ${ic(icn)}<span class="nl">${title}</span>${badge ? `<span class="nb ${badge[0]}">${badge[1]}</span>` : ''}</button>`;
+  const card = ([id, title, icn, sub, badge]) => `<button class="navcard" id="nav-${id}" data-act="nav" data-page="${id}" title="${esc(badge ? badge[2] : sub)}" ${state.page === id ? 'aria-current="page"' : ''}>
+    ${ic(icn)}<span class="nl">${title}</span>${badge ? `<span class="nb ${badge[0]}" aria-label="${esc(badge[2])}">${badge[1]}</span>` : ''}</button>`;
   const open = liveApps().filter(a => acc[a.key] && ['active','degraded'].includes(a.status));
   return `<aside class="side ${state.menuOpen ? 'open' : ''}">
     <div class="side-top"><div class="brand"><div class="logo">${ic('hub')}</div><div><b>Bancha</b><small>Control plane</small></div></div>

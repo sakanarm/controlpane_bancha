@@ -1,6 +1,6 @@
 # Bancha — Roadmap
 
-> อัปเดต: 13 Oct 2026 · อ่านคู่กับ `docs/ARCHITECTURE.md` (design) และ `docs/HANDOFF.md` (สถานะปัจจุบันและวิธีรัน)
+> อัปเดต: 14 Oct 2026 · อ่านคู่กับ `docs/ARCHITECTURE.md` (design) และ `docs/HANDOFF.md` (สถานะปัจจุบันและวิธีรัน)
 >
 > สัญลักษณ์: ✅ เสร็จ · 🟡 กำลังทำหรือทำได้บางส่วน · ⏳ รอของจากเจ้าของระบบ · ⬜ ยังไม่เริ่ม
 
@@ -24,7 +24,7 @@
 - ✅ Architecture และการตัดสินใจหลัก D1–D7 (`docs/ARCHITECTURE.md`)
 - ✅ Bancha App Contract v1: JSON Schema + manifest ตัวอย่างของ Arak, Prajak, OpenMetadata (`contracts/`)
 - ✅ Database schema ร่าง (`db/schema.sql`) ยังไม่ได้ใช้จริง
-- ✅ Prototype UI ธีม navy (`prototype/control-plane.html`)
+- ✅ Prototype UI หน้าตาแบบ Arak, sidebar สี navy, มีโลโก้แอพ (`prototype/control-plane.html`)
   - หน้า Login แบบเดียวกับ Arak: Sign in with MFEC หรือ username/password
   - Sidebar 2 กลุ่ม: **Control plane** (Overview, Users & groups, Connections, App registry, Distribution) เฉพาะ admin และ **Go to app** (My apps + แอพที่มีสิทธิ์)
   - user ทั่วไปเห็นแค่ My apps
@@ -46,7 +46,7 @@
 | 0.5 | ต่อ **Prajak** | ⏳ | URL และ DB ของ Prajak เพราะยังไม่เจอใน pm2 บน prod |
 | 0.6 | LDAP (ถ้ามี) | ⏳ | host, base DN, bind user |
 | 0.7 | เปลี่ยน OpenMetadata ไปใช้ **bot account** แทน account ส่วนตัว | ⏳ | bot token จาก OM (Settings → Bots) |
-| 0.8 | ขึ้น Git: https://github.com/sakanarm/controlpane_bancha | ⬜ | ยืนยันจากเจ้าของก่อน push |
+| 0.8 | ขึ้น Git: https://github.com/sakanarm/controlpane_bancha | ✅ | branch `main` |
 | 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ⬜ | ยืนยันจากเจ้าของก่อน |
 | 0.10 | nginx location `/Bancha` | ⏳ | ไฟล์ nginx เป็นของ root และใช้ร่วมกับแอพอื่น ต้องให้เจ้าของ server อนุมัติและทำให้ (ไฟล์ตัวอย่างอยู่ใน HANDOFF) |
 | 0.11 | ให้หน้าอื่น (Overview, Users & groups, App registry, Distribution) ใช้ข้อมูลจริง | ⬜ | ตอนนี้ยังเป็น sample data ต้องรอ Phase 1 (DB) และ 0.3 (Azure AD) |

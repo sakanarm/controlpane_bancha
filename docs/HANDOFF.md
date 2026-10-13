@@ -1,6 +1,6 @@
 # Bancha — Handoff
 
-> อัปเดต: 13 Oct 2026 · สำหรับคนที่มารับงานต่อ
+> อัปเดต: 14 Oct 2026 · สำหรับคนที่มารับงานต่อ
 > อ่านลำดับนี้: ไฟล์นี้ → `docs/ROADMAP.md` (ต้องทำอะไรต่อ) → `docs/ARCHITECTURE.md` (ทำไมออกแบบแบบนี้)
 
 ---
@@ -17,12 +17,12 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 
 | ส่วน | สถานะ |
 |---|---|
-| UI | Prototype ครบทุกเมนู ธีม navy หน้า login แบบเดียวกับ Arak |
+| UI | Prototype ครบทุกเมนู หน้าตาแบบ Arak (Untitled UI, font Inter, สีหลัก `#1570ef`) sidebar สี navy มีโลโก้ Arak, Prajak, OpenMetadata (ไฟล์ต้นฉบับใน `prototype/assets/` และฝังเป็น base64 ใน HTML) กระดิ่งแจ้งเตือนเปิดเป็น panel และนับเฉพาะเรื่องที่ยังไม่อ่าน |
 | Connections | **ต่อจริง** แบบ read-only ผ่าน `server/server.js` |
 | หน้าอื่น (Overview, Users & groups, App registry, Distribution) | ยังเป็น **sample data** ใน HTML |
 | Login | ยังเป็น prototype: รหัสอะไรก็ได้ หรือเลือก sample account |
 | DB ของ Bancha | ยังไม่มี (`db/schema.sql` เป็นแค่ร่าง) |
-| Git | ยังไม่ได้ `git init` และยังไม่ได้ push |
+| Git | อยู่บน https://github.com/sakanarm/controlpane_bancha branch `main` |
 | Prod | ยังไม่ได้ deploy |
 
 ### ผลการต่อจริง (13 Oct 2026)
@@ -93,7 +93,7 @@ set -a; source .env; set +a
 npm start                 # http://127.0.0.1:3950/
 ```
 
-- Login แบบ prototype ใช้รหัสอะไรก็ได้ ลองใช้ `sakan.pu` (Sakan Punyanon, admin) หรือ `bg.admin` (admin) และ `siriporn.k` (ไม่ใช่ admin) หรือกด "Sign in with MFEC" แล้วเลือก sample account เช่น `pimchanok.w`
+- Login แบบ prototype ใช้รหัสอะไรก็ได้ ลองใช้ `sakan.pu` (Sakan Punyanon, admin) หรือ `bg.admin` (admin) และ `siriporn.k` (ไม่ใช่ admin) หรือกด "Sign in with MFEC" แล้วเลือก sample account
 - เปิดไฟล์ HTML ตรง ๆ ได้ แต่จะเห็นแค่ sample data และไม่มี live connection
 
 ---
@@ -167,11 +167,11 @@ UI เรียก API ด้วย relative path (`api/...`) จึงทำง
 ## 7. งานถัดไปที่แนะนำ
 
 1. ขอของที่ขาดตาม ROADMAP Phase 0 (0.1–0.7) แล้วใส่ใน `.env` และกด Test all ในหน้า Connections
-2. ได้รับอนุมัติแล้วค่อย `git init`, push ขึ้น GitHub และ deploy prod ตามหัวข้อ 5 (ตอนอยู่บน prod จะ test auth-service ได้)
+2. ได้รับอนุมัติแล้วค่อย deploy prod ตามหัวข้อ 5 (ตอนอยู่บน prod จะ test auth-service ได้)
 3. เริ่ม Phase 1: ตกลงเรื่อง DB ของ Bancha ก่อน (ROADMAP 1.1) แล้วตามด้วย Azure AD sync เพื่อให้หน้า Users & groups ใช้ข้อมูลจริง
 
 ## 8. ความเสี่ยงที่ควรรู้
 
 - Credential หลายตัว (OM, arakdb, Arak admin, SSH) ถูกส่งผ่านแชทระหว่างพัฒนา **ควร rotate**
 - ตอนนี้ Bancha ใช้ user ของแอพอื่น (`arak` และ account OM ส่วนตัว) ควรขอ user read-only ของ Bancha เอง
-- `prototype/control-plane.html` เป็นไฟล์เดียวขนาดประมาณ 1,500 บรรทัด เมื่อเข้า Phase 1 ควรแยกเป็น frontend project (เช่น Vite) หรืออย่างน้อยแยก JS ออกมา
+- `prototype/control-plane.html` เป็นไฟล์เดียวขนาดประมาณ 1,700 บรรทัด (รวมโลโก้ base64) เมื่อเข้า Phase 1 ควรแยกเป็น frontend project (เช่น Vite) หรืออย่างน้อยแยก JS ออกมา

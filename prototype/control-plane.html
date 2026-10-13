@@ -528,6 +528,28 @@ tbody tr:hover td{background:var(--surface-2)}
 .navcard.mini .tile[data-logo]{background:#fff !important;padding:2px;width:24px;height:24px}
 :root[data-theme="dark"] .tile[data-logo]{background:#fff !important;padding:5px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tile[data-logo]{background:#fff !important;padding:5px}}
+/* Notifications panel */
+.bellwrap{position:relative;display:flex}
+.bellpanel{position:absolute;right:-8px;top:calc(100% + 10px);width:min(384px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 16px -4px rgba(16,24,40,.08),0 4px 6px -2px rgba(16,24,40,.03);z-index:60;overflow:hidden;animation:page-enter 180ms cubic-bezier(.16,1,.3,1) both}
+.bp-h{display:flex;align-items:baseline;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.bp-h b{font-size:15px;font-weight:600}
+.bp-h small{color:var(--muted);font-size:13px}
+.bp-list{max-height:min(420px,60vh);overflow-y:auto}
+.bp-item{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 16px;cursor:pointer;color:var(--fg);font:inherit}
+.bp-item:hover{background:var(--surface-2)}
+.bp-item:focus-visible{outline:2px solid var(--accent-ring);outline-offset:-2px}
+.bp-ic{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--surface-2)}
+.bp-ic .ic{width:16px;height:16px}
+.bp-ic.t-bad{background:var(--bad-soft)} .bp-ic.t-warn{background:var(--warn-soft)}
+.bp-tx{flex:1;min-width:0}
+.bp-tx b{display:block;font-size:14px;font-weight:600}
+.bp-tx small{display:block;color:var(--muted);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+.bp-new{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;margin-top:6px}
+.bp-empty{display:flex;align-items:center;gap:8px;padding:20px 16px;color:var(--muted)}
+.bp-empty .ic{width:16px;height:16px;color:var(--ok)}
+.bp-f{display:block;width:100%;border:0;background:transparent;padding:12px 16px;color:var(--accent-text);font:inherit;font-weight:600;font-size:14px;cursor:pointer;text-align:center}
+.bp-f:hover{background:var(--surface-2)}
+@media (max-width:640px){.bellwrap{position:static}.bellpanel{left:16px;right:16px;top:calc(100% + 8px);width:auto}}
 @keyframes page-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .page-enter{animation:page-enter 320ms cubic-bezier(.16,1,.3,1) both}
 @media (prefers-reduced-motion: reduce){.page-enter{animation:none}}
@@ -702,6 +724,7 @@ const PAGES_ORDER = ['myapps','overview','identity','connections','apps','sync']
 const state = {
   page: null,
   session: null, handoff: null, menuOpen: false,
+  bellOpen: false, bellNew: new Set(), readAtt: new Set((() => { try { return JSON.parse(sessionStorage.getItem('bancha-read') || '[]'); } catch { return []; } })()),
   login: { mode:'choose', target: null, user: '', err: '' },
   sub: { identity:'users', connections:'data_source', apps:'registry', sync:'deliveries' },
   q: { users:'', groups:'', conns:'', dlv:'', audit:'' },
@@ -830,13 +853,20 @@ function navHTML(){
 }
 const CRUMB = { myapps:['Go to app','My apps'], overview:['Control plane','Overview'], identity:['Control plane','Users & groups'], connections:['Control plane','Connections'], apps:['Control plane','App registry'], sync:['Control plane','Distribution'] };
 const themeBtn = (cls = 'light') => `<button class="iconbtn ${cls}" data-act="theme" aria-label="Toggle dark mode">${ic(isDark() ? 'sun' : 'moon')}</button>`;
+function bellPanel(att){
+  const item = x => `<button class="bp-item" data-act="${x.act}" data-id="${esc(x.id)}"><span class="bp-ic t-${x.tone}">${ic(x.icon)}</span><span class="bp-tx"><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></span>${state.bellNew.has(x.title) ? '<span class="bp-new" aria-label="New"></span>' : ''}</button>`;
+  return `<div class="bellpanel" role="dialog" aria-label="Notifications">
+    <div class="bp-h"><b>Notifications</b><small>${att.length ? `${att.length} item${att.length === 1 ? '' : 's'}` : ''}</small></div>
+    <div class="bp-list">${att.map(item).join('') || `<div class="bp-empty">${ic('check')}You're all caught up</div>`}</div>
+    <button class="bp-f" data-act="nav" data-page="overview">View all on Overview</button></div>`;
+}
 function topbar(){
-  const u = me(), admin = isAdmin(u), n = admin ? attention().filter(a => a.tone !== 'mute').length : 0;
+  const u = me(), admin = isAdmin(u), att = admin ? attention() : [], n = att.filter(a => a.tone !== 'mute' && !state.readAtt.has(a.title)).length;
   return `<header class="topbar">
     ${admin ? `<label class="tsearch" for="gsearch">${ic('search')}<input id="gsearch" placeholder="Search users, groups and email" autocomplete="off" aria-label="Search users and groups"></label>` : ''}
     <span class="grow"></span>
     ${LIVE.on && state.page === 'connections' ? '<span class="sample live">Live · real connections</span>' : '<span class="sample">Prototype · sample data</span>'}
-    ${admin ? `<button class="iconbtn" data-act="nav" data-page="overview" aria-label="${n} items need attention" title="Needs attention">${ic('bell')}${n ? `<i>${n}</i>` : ''}</button>` : ''}
+    ${admin ? `<div class="bellwrap"><button class="iconbtn" data-act="bell" aria-label="Notifications${n ? `, ${n} unread` : ''}" aria-expanded="${state.bellOpen}" title="Notifications">${ic('bell')}${n ? `<i>${n}</i>` : ''}</button>${state.bellOpen ? bellPanel(att) : ''}</div>` : ''}
     ${themeBtn('')}
     <div class="tme"><span class="avatar">${initials(u.name)}</span><div><b>${esc(u.name)}</b><small>${admin ? 'Platform admin' : 'Member'}</small></div></div>
   </header>`;
@@ -977,8 +1007,10 @@ function topology(){
     const tone = a.status === 'active' && lag(a) <= 20 ? 'var(--ok)' : a.status === 'suspended' ? 'var(--faint)' : 'var(--warn)';
     const live = a.status === 'active';
     s += `<path class="e ${live ? 'live' : 'dash'}" d="M${bx + bw} ${cy} C ${bx + bw + 70} ${cy}, 720 ${y + 26}, 790 ${y + 26}" marker-end="url(#${live ? 'arrA' : 'arr'})"/>
-    <rect class="n" x="790" y="${y}" width="190" height="52" rx="10"/><circle cx="808" cy="${y + 26}" r="5" fill="${tone}"/>
-    <text class="t" x="822" y="${y + 23}">${esc(a.name)}</text><text class="s" x="822" y="${y + 40}">${a.mode === 'adapter' ? 'adapter → REST API' : 'webhook · CloudEvents'}</text>`; });
+    <rect class="n" x="790" y="${y}" width="190" height="52" rx="10"/>
+    <rect x="802" y="${y + 11}" width="30" height="30" rx="7" fill="#fff"/>${LOGO[a.key] ? `<image href="${LOGO[a.key]}" x="805" y="${y + 14}" width="24" height="24"/>` : `<text class="t" x="817" y="${y + 31}" text-anchor="middle">${esc(a.name[0])}</text>`}
+    <circle cx="966" cy="${y + 14}" r="4.5" fill="${tone}"><title>${esc(a.status)}</title></circle>
+    <text class="t" x="842" y="${y + 23}">${esc(a.name)}</text><text class="s" x="842" y="${y + 40}">${a.mode === 'adapter' ? 'adapter → REST API' : 'webhook · CloudEvents'}</text>`; });
   const ry = ay(slots.length);
   s += `<rect class="n" x="790" y="${ry}" width="190" height="52" rx="10" style="stroke-dasharray:4 4;fill:transparent"/><text class="s" x="808" y="${ry + 31}">+ next app (Likit, …)</text>`;
   const ds = by + bh + 50;
@@ -1540,12 +1572,22 @@ function renderLayer(){
 }
 function openLayer(kind, id){ state.layer = { kind, id }; renderLayer(); }
 function closeLayer(){ state.layer = null; state.wiz = null; if (wzTimer) { clearInterval(wzTimer); wzTimer = null; } $('#layer').innerHTML = ''; }
-function go(page, sub){ state.page = page; state.handoff = null; state.menuOpen = false; if (sub) state.sub[page] = sub; try { history.replaceState(null, '', '#' + page); } catch {} render(); window.scrollTo({ top:0 }); }
+function go(page, sub){ state.page = page; state.handoff = null; state.menuOpen = false; state.bellOpen = false; if (sub) state.sub[page] = sub; try { history.replaceState(null, '', '#' + page); } catch {} render(); window.scrollTo({ top:0 }); }
 
 /* ───────────── Actions ───────────── */
 let wzTimer = null;
 const ACT = {
   nav: d => go(d.page),
+  bell: () => {
+    state.bellOpen = !state.bellOpen;
+    if (state.bellOpen) {   // opening marks everything as read; remember what was new to show the dot this time
+      const att = attention();
+      state.bellNew = new Set(att.filter(a => !state.readAtt.has(a.title)).map(a => a.title));
+      att.forEach(a => state.readAtt.add(a.title));
+      try { sessionStorage.setItem('bancha-read', JSON.stringify([...state.readAtt])); } catch {}
+    }
+    render();
+  },
   sub: d => { state.sub[d.page] = d.id; render(); },
   theme: () => { const root = document.documentElement; root.dataset.theme = isDark() ? 'light' : 'dark'; try { localStorage.setItem('bancha-theme', root.dataset.theme); } catch {} render(); },
   menu: () => { state.menuOpen = !state.menuOpen; render(); },
@@ -1634,12 +1676,15 @@ function finishWizard(){
 
 /* ───────────── Wiring ───────────── */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-act]'); if (!t) return;
+  const t = e.target.closest('[data-act]');
+  if (state.bellOpen && !(t && t.dataset.act === 'bell') && !(!t && e.target.closest('.bellpanel'))) { state.bellOpen = false; render(); }
+  if (!t) return;
   const fn = ACT[t.dataset.act]; if (!fn) return;
   if (t.tagName === 'TR' && e.target.closest('button,select,input,a')) return;
   fn(t.dataset, t, e);
 });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.bellOpen) { state.bellOpen = false; render(); $('[data-act=bell]')?.focus(); return; }
   if (e.key === 'Escape' && state.layer) closeLayer();
   if (e.key === 'Enter' && e.target.matches('tr[data-act]')) e.target.click();
   if (e.key === 'Enter' && e.target.id === 'gsearch') { state.q.users = e.target.value.trim(); state.sub.identity = 'users'; go('identity'); }

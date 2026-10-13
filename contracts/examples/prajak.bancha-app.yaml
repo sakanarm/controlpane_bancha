@@ -1,0 +1,42 @@
+apiVersion: bancha.io/v1
+kind: App
+metadata:
+  key: prajak
+  name: Prajak
+  description: Data Quality. Runs rule-based checks and publishes results to OpenMetadata.
+  owner: data-quality@example.co.th
+  icon: check
+spec:
+  version: 1.8.2
+  baseUrl: https://prajak.internal
+  auth:
+    oidc:
+      redirectUris: [https://prajak.internal/oauth/callback]
+  roles:
+    - key: admin
+      name: DQ Admin
+    - key: editor
+      name: Rule Editor
+    - key: viewer
+      name: Viewer
+      default: true
+  requires:
+    identity:
+      users:
+        attributes: [username, email, displayName]
+      groups: true
+    connections:
+      - types: [postgresql, oracle, mssql, snowflake, databricks, trino]
+        profiles: [read]
+        reason: Executes data quality queries
+      - types: [openmetadata]
+        profiles: [write]
+        reason: Publishes test case results
+  consumes:
+    scopes: [arak:policies.read]
+  events:
+    subscribe: [user.*, group.*, rolebinding.*, connection.*, app.*, sync.*]
+    publish: [prajak.run.failed]
+  delivery:
+    mode: webhook
+  dependsOn: [openmetadata]

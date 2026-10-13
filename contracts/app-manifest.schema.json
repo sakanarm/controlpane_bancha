@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bancha.internal/schemas/app-manifest/v1.json",
+  "title": "Bancha App Manifest v1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "const": "bancha.io/v1" },
+    "kind": { "enum": ["App", "Adapter"] },
+    "metadata": {
+      "type": "object",
+      "required": ["key", "name", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,30}$",
+          "description": "Stable identifier. Used as role prefix (arak.steward), token audience and URL slug. Cannot change after registration."
+        },
+        "name": { "type": "string", "maxLength": 60 },
+        "description": { "type": "string", "maxLength": 280 },
+        "owner": { "type": "string", "format": "email", "description": "Team mailbox that receives lifecycle notifications." },
+        "icon": { "type": "string" },
+        "docsUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["version", "baseUrl", "delivery"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string", "description": "App semantic version." },
+        "baseUrl": { "type": "string", "format": "uri" },
+        "endpoints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "health": { "type": "string", "default": "/bancha/health" },
+            "events": { "type": "string", "default": "/bancha/events" },
+            "bootstrap": { "type": "string", "default": "/bancha/bootstrap" }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "oidc": {
+              "type": "object",
+              "required": ["redirectUris"],
+              "additionalProperties": false,
+              "properties": {
+                "redirectUris": { "type": "array", "items": { "type": "string", "format": "uri" }, "minItems": 1 },
+                "postLogoutRedirectUris": { "type": "array", "items": { "type": "string", "format": "uri" } }
+              }
+            }
+          }
+        },
+        "roles": {
+          "type": "array",
+          "description": "Roles this app understands. Bancha binds users/groups to them; the app decides what they allow.",
+          "items": {
+            "type": "object",
+            "required": ["key", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "default": { "type": "boolean", "description": "Granted to every synced user that has no other role in this app." }
+            }
+          }
+        },
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "users": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "type": "array",
+                      "uniqueItems": true,
+                      "items": { "enum": ["username", "email", "displayName", "givenName", "familyName", "department", "jobTitle", "manager", "employeeId", "phone"] }
+                    }
+                  }
+                },
+                "groups": { "type": "boolean", "default": false }
+              }
+            },
+            "connections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["types", "profiles"],
+                "additionalProperties": false,
+                "properties": {
+                  "types": {
+                    "type": "array",
+                    "items": { "enum": ["postgresql", "oracle", "mssql", "mysql", "snowflake", "databricks", "trino", "bigquery", "hive", "redshift", "openmetadata"] }
+                  },
+                  "profiles": { "type": "array", "items": { "enum": ["metadata", "read", "write", "admin"] } },
+                  "reason": { "type": "string", "description": "Shown to the admin on the approval screen." }
+                }
+              }
+            }
+          }
+        },
+        "provides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key"],
+                "properties": {
+                  "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9.-]*$" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "consumes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scopes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "events": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subscribe": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[a-z.*]+$" },
+              "description": "Glob on event type without the io.bancha. prefix, e.g. user.*, connection.secret.rotated"
+            },
+            "publish": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "enum": ["webhook", "poll", "adapter"] },
+            "adapter": { "type": "string", "description": "Adapter implementation when mode = adapter, e.g. openmetadata, scim" },
+            "maxBatch": { "type": "integer", "minimum": 1, "maximum": 500, "default": 1 }
+          }
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "App keys this app needs. Bancha blocks unregistering a dependency while dependents are active."
+        }
+      }
+    }
+  }
+}

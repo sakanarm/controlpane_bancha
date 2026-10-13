@@ -1,0 +1,72 @@
+{
+  "_comment": "Connections Bancha tests and inventories. No secrets here: each secret is named by the environment variable that holds it (set in .env, which is not committed). Every check is read-only.",
+  "connections": [
+    {
+      "id": "arakdb",
+      "cat": "data_source",
+      "type": "PostgreSQL",
+      "host": "10.4.155.151",
+      "port": 5432,
+      "db": "arakdb",
+      "owner": "Arak team",
+      "note": "Arak's own application database. Also registered in OpenMetadata as service arakdb.",
+      "profiles": [{ "p": "read", "user": "arak", "secretEnv": "CONN_ARAKDB_PASSWORD" }],
+      "grants": { "openmetadata": ["metadata"] }
+    },
+    {
+      "id": "employees-sample",
+      "cat": "data_source",
+      "type": "PostgreSQL",
+      "host": "10.6.150.110",
+      "port": 5432,
+      "db": "employees",
+      "owner": "Data platform",
+      "note": "Registered in OpenMetadata as service postgres_employees_sample.",
+      "profiles": [{ "p": "read", "user": "postgres", "secretEnv": "CONN_EMPLOYEES_PASSWORD" }],
+      "grants": { "openmetadata": ["metadata"] }
+    },
+    {
+      "id": "dtp-iprm",
+      "cat": "data_source",
+      "type": "PostgreSQL",
+      "host": "10.6.150.102",
+      "port": 55432,
+      "db": "iprm",
+      "owner": "Data platform",
+      "note": "Registered in OpenMetadata as service dtp-iprm.",
+      "profiles": [{ "p": "read", "user": "iprm", "secretEnv": "CONN_IPRM_PASSWORD" }],
+      "grants": { "openmetadata": ["metadata"] }
+    },
+    {
+      "id": "openmetadata-mfec",
+      "cat": "metadata",
+      "type": "OpenMetadata",
+      "url": "http://10.6.150.110:8585",
+      "owner": "Data platform",
+      "note": "Basic auth (provider: basic). Uses a personal admin account for now; a bot token is better.",
+      "profiles": [{ "p": "read", "user": "Sakan_pu@mfec.co.th", "secretEnv": "CONN_OM_PASSWORD" }],
+      "grants": { "arak": ["read"] }
+    },
+    {
+      "id": "mfec-entra",
+      "cat": "directory",
+      "type": "Azure AD",
+      "url": "https://login.microsoftonline.com",
+      "owner": "MFEC IT",
+      "note": "MFEC tenant. Arak already signs in with it. Bancha needs its own app registration to read users and groups.",
+      "tenantEnv": "ENTRA_TENANT_ID",
+      "profiles": [{ "p": "default", "userEnv": "ENTRA_CLIENT_ID", "secretEnv": "ENTRA_CLIENT_SECRET" }],
+      "grants": {}
+    },
+    {
+      "id": "mfec-auth-service",
+      "cat": "directory",
+      "type": "auth-service",
+      "url": "http://127.0.0.1:3900",
+      "owner": "Platform (auth-service on pipeappsrv09)",
+      "note": "Central credential service on the prod box (AuthDB). Loopback only, so it is reachable only when Bancha runs on that box.",
+      "profiles": [{ "p": "default", "user": "x-api-key", "secretEnv": "CONN_AUTHSVC_API_KEY" }],
+      "grants": {}
+    }
+  ]
+}

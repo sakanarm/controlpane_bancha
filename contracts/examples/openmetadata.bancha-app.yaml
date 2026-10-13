@@ -1,0 +1,36 @@
+# OpenMetadata does not implement the Bancha contract itself.
+# Bancha runs the built-in "openmetadata" adapter on its behalf.
+apiVersion: bancha.io/v1
+kind: Adapter
+metadata:
+  key: openmetadata
+  name: OpenMetadata
+  description: Metadata catalog, lineage and glossary. Shared metadata hub for Arak and Prajak.
+  owner: data-platform@example.co.th
+  icon: catalog
+spec:
+  version: 1.5.4
+  baseUrl: https://openmetadata.internal
+  auth:
+    oidc:
+      redirectUris: [https://openmetadata.internal/callback]
+  roles:
+    - key: data-steward
+      name: DataSteward
+    - key: data-consumer
+      name: DataConsumer
+      default: true
+  requires:
+    identity:
+      users:
+        attributes: [username, email, displayName]
+      groups: true
+    connections:
+      - types: [postgresql, oracle, mssql, snowflake, databricks, trino, bigquery, hive]
+        profiles: [metadata]
+        reason: Creates DatabaseService entries and runs metadata ingestion
+  events:
+    subscribe: [user.*, group.*, rolebinding.*, connection.*]
+  delivery:
+    mode: adapter
+    adapter: openmetadata

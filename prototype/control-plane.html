@@ -1,0 +1,1722 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bancha Control Plane</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: navy sidebar (after the BO Conversion screen) beside a white work area in Arak's look (OpenMetadata ui-core-components: Inter, gray scale, brand blue #1570ef) */
+:root{
+  --hdr:#0b1b55; --hdr-card:#15276a; --hdr-card-hover:#1c3080; --hdr-active:#283c8f; --hdr-fg:#ffffff; --hdr-muted:#b4bfe6; --hdr-line:rgba(255,255,255,.24);
+  --mint:#c9f0d6; --mint-fg:#0f5e33; --amber:#ffd79a; --amber-fg:#6b3b00; --rose:#ffc9c3; --rose-fg:#7a1a12;
+  --bg:#ffffff; --surface:#ffffff; --surface-2:#f9fafb; --hover:#f9fafb; --line:#eaecf0; --line-strong:#d0d5dd;
+  --fg:#101828; --fg-2:#344054; --muted:#475467; --faint:#98a2b3;
+  --accent:#1570ef; --accent-fg:#ffffff; --accent-soft:#eff8ff; --accent-hover:#175cd3; --accent-line:#b2ddff; --accent-text:#175cd3; --accent-ring:#84caff;
+  --ok:#079455; --ok-soft:#ecfdf3; --ok-line:#abefc6; --ok-text:#067647;
+  --warn:#dc6803; --warn-soft:#fffaeb; --warn-line:#fedf89; --warn-text:#b54708;
+  --bad:#d92d20; --bad-soft:#fef3f2; --bad-line:#fecdca; --bad-text:#b42318;
+  --xs:0 1px 2px rgba(16,24,40,.05); --ring:0 0 0 4px rgba(21,112,239,.14);
+  --c-arak:#3157e0; --c-prajak:#0f8f84; --c-openmetadata:#7348e0; --c-likit:#c27100; --c-bancha:#0b1b55;
+  --code-bg:#0f1838; --code-fg:#dfe6ff; --code-key:#9fb4ff; --code-str:#9be2bb;
+  --scrim:rgba(8,14,40,.48);
+  --shadow:0 1px 3px rgba(16,24,40,.1), 0 1px 2px rgba(16,24,40,.06);
+  --font:"Inter","IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --hdr:#070f2e; --hdr-card:#101c4a; --hdr-card-hover:#16255c; --hdr-active:#1f3278; --hdr-fg:#ffffff; --hdr-muted:#a9b4dc; --hdr-line:rgba(255,255,255,.2);
+  --mint:#1f5136; --mint-fg:#c4f3d5; --amber:#4d3410; --amber-fg:#ffd79a; --rose:#4d1b17; --rose-fg:#ffc9c3;
+  --bg:#0c111d; --surface:#161b26; --surface-2:#1f242f; --hover:#1f242f; --line:#333741; --line-strong:#4b505c;
+  --fg:#f5f5f6; --fg-2:#cecfd2; --muted:#94969c; --faint:#61646c;
+  --accent:#2e90fa; --accent-fg:#ffffff; --accent-soft:#102a56; --accent-hover:#1570ef; --accent-line:#194185; --accent-text:#84caff; --accent-ring:#2e90fa;
+  --ok:#17b26a; --ok-soft:#053321; --ok-line:#085d3a; --ok-text:#75e0a7;
+  --warn:#f79009; --warn-soft:#4e1d09; --warn-line:#93370d; --warn-text:#fec84b;
+  --bad:#f04438; --bad-soft:#55160c; --bad-line:#912018; --bad-text:#fda29b;
+  --xs:0 1px 2px rgba(0,0,0,.3); --ring:0 0 0 4px rgba(46,144,250,.24);
+  --c-arak:#7b93ff; --c-prajak:#3cc4b7; --c-openmetadata:#a58bff; --c-likit:#f0a43c; --c-bancha:#c9d3ff;
+  --code-bg:#070c1f; --code-fg:#dfe6ff; --code-key:#9fb4ff; --code-str:#9be2bb;
+  --scrim:rgba(0,0,0,.6);
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --hdr:#070f2e; --hdr-card:#101c4a; --hdr-card-hover:#16255c; --hdr-active:#1f3278; --hdr-fg:#ffffff; --hdr-muted:#a9b4dc; --hdr-line:rgba(255,255,255,.2);
+  --mint:#1f5136; --mint-fg:#c4f3d5; --amber:#4d3410; --amber-fg:#ffd79a; --rose:#4d1b17; --rose-fg:#ffc9c3;
+  --bg:#0c111d; --surface:#161b26; --surface-2:#1f242f; --hover:#1f242f; --line:#333741; --line-strong:#4b505c;
+  --fg:#f5f5f6; --fg-2:#cecfd2; --muted:#94969c; --faint:#61646c;
+  --accent:#2e90fa; --accent-fg:#ffffff; --accent-soft:#102a56; --accent-hover:#1570ef; --accent-line:#194185; --accent-text:#84caff; --accent-ring:#2e90fa;
+  --ok:#17b26a; --ok-soft:#053321; --ok-line:#085d3a; --ok-text:#75e0a7;
+  --warn:#f79009; --warn-soft:#4e1d09; --warn-line:#93370d; --warn-text:#fec84b;
+  --bad:#f04438; --bad-soft:#55160c; --bad-line:#912018; --bad-text:#fda29b;
+  --xs:0 1px 2px rgba(0,0,0,.3); --ring:0 0 0 4px rgba(46,144,250,.24);
+  --c-arak:#7b93ff; --c-prajak:#3cc4b7; --c-openmetadata:#a58bff; --c-likit:#f0a43c; --c-bancha:#c9d3ff;
+  --code-bg:#070c1f; --code-fg:#dfe6ff; --code-key:#9fb4ff; --code-str:#9be2bb;
+  --scrim:rgba(0,0,0,.6);
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.wrap{max-width:1400px;margin:0 auto;padding-inline:clamp(16px,3vw,32px)}
+.num,td.num{font-variant-numeric:tabular-nums}
+td.num{white-space:nowrap}
+.mono{font-family:var(--mono);font-size:.88em}
+
+/* ── Shell: navy sidebar (the screenshot's header cards, stacked) beside the cool-grey work area ── */
+.shell{display:grid;grid-template-columns:292px minmax(0,1fr);min-height:100vh}
+.side{background:var(--hdr);color:var(--hdr-fg);position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;padding:20px 14px 16px}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.side-body{display:flex;flex-direction:column;flex:1;padding-top:18px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;padding-inline:6px}
+.logo{width:44px;height:44px;border-radius:11px;background:#3a5cf5;display:grid;place-items:center;flex:none}
+.logo .ic{width:25px;height:25px;color:#fff}
+.brand b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.brand small{display:block;color:var(--hdr-muted);font-size:13.5px;font-weight:500}
+.envbtn{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--hdr-line);background:transparent;color:var(--hdr-fg);border-radius:9px;padding:9px 12px;cursor:pointer;font-size:14.5px}
+.envbtn span{color:var(--hdr-muted)}
+.envbtn b{margin-left:auto;font-weight:500}
+.envbtn .ic{width:16px;height:16px;color:var(--hdr-muted)}
+.grp-l{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--hdr-muted);padding:18px 8px 8px}
+.sample.live{color:var(--mint-fg);background:var(--mint)}
+.sample{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber-fg);background:var(--amber);border-radius:6px;padding:4px 8px}
+.iconbtn{width:38px;height:38px;border-radius:9px;border:1px solid var(--hdr-line);background:transparent;color:var(--hdr-fg);display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn.light{border-color:var(--line);color:var(--fg);background:var(--surface)}
+.avatar{width:38px;height:38px;border-radius:50%;background:#3a5cf5;color:#fff;display:grid;place-items:center;font-weight:600;font-size:13.5px;flex:none}
+.nav{display:grid;gap:8px}
+.navcard{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:var(--hdr-card);border:0;border-radius:11px;padding:12px 14px;color:var(--hdr-fg);cursor:pointer;min-width:0;transition:background .15s}
+.navcard:hover{background:var(--hdr-card-hover)}
+.navcard[aria-current="page"]{background:var(--hdr-active);box-shadow:inset 3px 0 0 #fff}
+.navcard b{display:block;font-size:16px;font-weight:600}
+.navcard small{display:block;color:var(--hdr-muted);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navcard > div{min-width:0}
+.dot-badge{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:700;font-size:14px}
+.dot-badge .ic{width:17px;height:17px;stroke-width:2.6}
+.dot-badge.ok{background:var(--mint);color:var(--mint-fg)}
+.dot-badge.warn{background:var(--amber);color:var(--amber-fg)}
+.dot-badge.bad{background:var(--rose);color:var(--rose-fg)}
+.dot-badge.icon{background:rgba(255,255,255,.14);color:var(--hdr-fg)}
+.dot-badge.icon .ic{stroke-width:2}
+.navcard[aria-current="page"] .dot-badge.ok,.navcard[aria-current="page"] .dot-badge.icon{background:#fff;color:var(--hdr)}
+.side-foot{margin-top:auto;padding-top:20px}
+.me{display:flex;align-items:center;gap:11px;padding:10px;border-radius:11px;background:var(--hdr-card)}
+.me > div{min-width:0;flex:1}
+.me b{display:block;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me small{display:block;font-size:12.5px;color:var(--hdr-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menubtn{display:none}
+.crumbs{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:20px;color:var(--muted);font-size:14px}
+.crumbs .src{color:var(--muted)} .crumbs .src b{color:var(--fg);font-weight:600}
+.crumbs .src .ic{width:14px;height:14px}
+.crumbs > span:last-child{display:flex;align-items:center;gap:10px}
+@media (max-width:900px){
+  .shell{display:block}
+  .side{position:static;height:auto;padding:12px 16px}
+  .brand{padding:0}
+  .menubtn{display:grid}
+  .side:not(.open) .side-body{display:none}
+  .side-body{padding-top:12px}
+}
+
+/* ── Sign-in ── */
+.login{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);background:var(--surface)}
+.login-main{position:relative;display:flex;align-items:center;justify-content:center;padding:72px clamp(16px,4vw,48px) 48px}
+.login-tools{position:absolute;top:16px;right:16px;display:flex;gap:10px;align-items:center}
+.login-box{width:min(384px,100%)}
+.login-logo{display:flex;align-items:center;gap:14px;margin-bottom:56px}
+.login-logo .logo{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#0b1b55 0%,#2a4bd8 62%,#1aa3d9 100%);box-shadow:0 8px 20px -10px rgba(42,75,216,.7)}
+.login-logo .logo .ic{width:36px;height:36px}
+.login-logo .wm{border-left:2px solid var(--accent);padding-left:12px}
+.login-logo b{display:block;font-size:34px;line-height:1;font-weight:700;letter-spacing:.08em;color:var(--fg)}
+.login-logo small{display:block;margin-top:5px;font-size:12px;font-weight:500;color:var(--muted)}
+.login-box h1{font-size:24px;font-weight:600;margin:0 0 8px;letter-spacing:-.01em}
+.login-box > p{margin:0 0 32px;color:var(--muted);font-size:14px}
+.btn-sso{display:flex;width:100%;align-items:center;justify-content:center;gap:12px;border:0;border-radius:7px;padding:9px 16px;min-height:44px;font-weight:600;font-size:15.5px;color:#fff;cursor:pointer;background:linear-gradient(90deg,#0b1b55 0%,#2a4bd8 55%,#1aa3d9 100%);box-shadow:0 8px 18px -8px rgba(42,75,216,.65)}
+.btn-sso:hover{filter:brightness(1.08)}
+.ms{width:26px;height:26px;border-radius:5px;background:#fff;display:grid;place-items:center;flex:none}
+.btn-alt{display:flex;width:100%;align-items:center;justify-content:center;gap:10px;margin-top:16px;min-height:44px;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);color:var(--fg);font-size:15.5px;cursor:pointer}
+.btn-alt:hover{background:var(--hover)}
+.btn-alt .ic{width:18px;height:18px;color:var(--muted)}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--accent);padding:0;margin:-12px 0 20px;cursor:pointer;font-size:14px}
+.back .ic{width:16px;height:16px;transform:rotate(180deg)}
+.login-note{margin-top:28px;color:var(--faint);font-size:12.5px;line-height:1.5}
+.login-note .mono{color:var(--muted)}
+.login-side{background:var(--bg);border-left:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:48px clamp(24px,5vw,64px)}
+.login-side h2{font-size:30px;font-weight:600;margin:0 0 30px;letter-spacing:-.015em;text-wrap:balance}
+.feat{display:flex;gap:16px;align-items:flex-start;margin-bottom:26px;max-width:560px}
+.feat .fi{width:40px;height:40px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;place-items:center;color:var(--accent);flex:none}
+.feat .fi .ic{width:19px;height:19px}
+.feat b{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+.feat span{color:var(--muted);font-size:14px;text-wrap:pretty}
+.btn.block{width:100%;justify-content:center;padding:11px 16px}
+.stack{display:grid;gap:14px}
+.rcard.acct{display:flex;gap:12px;align-items:center;width:100%}
+.rcard.acct b{color:var(--fg)}
+.rcard.acct .avatar{color:#fff;font-size:13.5px}
+.handoff{min-height:100vh;background:var(--hdr);display:grid;place-items:center;padding:32px 16px}
+.ho-card{width:min(660px,100%);background:var(--surface);border-radius:16px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5);overflow:hidden}
+.ho-b{padding:20px 24px;display:grid;gap:16px}
+.checks li.wait{color:var(--faint)}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;padding:20px}
+.flow > div{display:flex;gap:12px;align-items:flex-start}
+.flow .dot-badge{background:var(--accent-soft);color:var(--accent)}
+.flow b{display:block} .flow span{color:var(--muted);font-size:14px}
+.app.dim .app-h,.app.dim .dl{opacity:.62}
+@media (max-width:900px){.login{grid-template-columns:1fr}.login-side{display:none}.login-logo{margin-bottom:40px}}
+.navcard.mini{padding:9px 12px;gap:11px}
+.navcard.mini .tile{width:30px;height:30px;font-size:13px;border-radius:8px;background:var(--c);color:#fff}
+.navcard.mini b{font-size:15px}
+.navcard.mini .go{margin-left:auto;color:var(--hdr-muted)}
+.navcard.mini .go .ic{width:15px;height:15px}
+
+/* ── Page head ── */
+main{padding-block:0 72px}
+.crumbs + .eyebrow{margin-top:18px}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 24px;flex-wrap:wrap;margin-bottom:22px}
+.head h1{font-size:32px;line-height:1.15;font-weight:700;margin:6px 0 6px;letter-spacing:-.015em;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px 26px;color:var(--muted);font-size:15px}
+.meta b{color:var(--fg);font-weight:600}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid transparent;background:var(--surface-2);color:var(--fg);border-radius:9px;padding:9px 16px;font-size:15px;font-weight:500;cursor:pointer;white-space:nowrap;transition:filter .15s, background .15s}
+.btn:hover{filter:brightness(.97)}
+.btn.primary{background:var(--accent);color:var(--accent-fg)}
+.btn.ghost{background:transparent;border-color:var(--line)}
+.btn.danger{color:var(--bad)}
+.btn.danger.solid{background:var(--bad);color:#fff}
+.btn.sm{padding:6px 11px;font-size:14px;border-radius:8px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:11px;padding:4px;gap:2px;margin-bottom:20px;flex-wrap:wrap}
+.seg button{display:inline-flex;align-items:center;gap:8px;border:0;background:transparent;padding:8px 16px;border-radius:8px;font-size:16px;font-weight:500;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
+
+/* ── KPI tiles ── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:22px}
+.kpi{background:var(--surface);border-radius:13px;padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--line);min-width:0}
+.kpi .lbl{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.kpi .lbl .ic{width:17px;height:17px}
+.kpi .val{font-size:34px;font-weight:700;line-height:1.1;margin:10px 0 6px;font-variant-numeric:tabular-nums}
+.kpi .sub{color:var(--muted);font-size:15px}
+.kpi.warn .val{color:var(--warn)} .kpi.bad .val{color:var(--bad)} .kpi.ok .val{color:var(--ok)}
+
+/* ── Cards, tables ── */
+.card{background:var(--surface);border-radius:13px;border:1px solid var(--line);box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 20px 12px;flex-wrap:wrap}
+.card-h h2{font-size:17px;font-weight:600;margin:0}
+.card-h p{margin:0;color:var(--muted);font-size:14px}
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 20px}
+.filters .spacer{flex:1}
+.filters .count{color:var(--muted);font-size:15px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:9px;padding:0 12px;background:var(--surface);flex:1 1 260px;max-width:400px;color:var(--muted)}
+.search input{border:0;outline:0;background:transparent;padding:9px 0;width:100%;color:var(--fg);font-size:15px}
+.search:focus-within{border-color:var(--accent)}
+.fsel{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);border-radius:9px;padding:0 10px 0 13px;background:var(--surface);color:var(--muted);font-size:15px}
+.fsel select{appearance:none;-webkit-appearance:none;border:0;outline:0;background:transparent;color:var(--fg);font-weight:500;padding:9px 18px 9px 2px;cursor:pointer}
+.fsel .ic{position:absolute;right:9px;width:15px;height:15px;pointer-events:none}
+.fsel:focus-within{border-color:var(--accent)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:860px}
+th{background:var(--surface-2);color:var(--muted);font-size:13px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:12px 20px;white-space:nowrap}
+td{padding:13px 20px;border-top:1px solid var(--line);vertical-align:top}
+tbody tr[data-act]{cursor:pointer}
+tbody tr:hover td{background:var(--hover)}
+.cell-title{font-weight:600}
+.cell-sub{color:var(--muted);font-size:14px;margin-top:1px}
+.tbl-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+
+/* ── Chips & pills ── */
+.tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;background:var(--surface-2);color:var(--muted);border-radius:5px;padding:2px 7px;vertical-align:1px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;border:1px solid var(--line);border-radius:6px;padding:2px 8px;white-space:nowrap;background:var(--surface)}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--c,var(--faint));flex:none}
+.chip.more{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.mute{background:var(--surface-2);color:var(--muted)}
+.pill.info{background:var(--accent-soft);color:var(--accent)}
+.src{display:inline-flex;align-items:center;gap:7px;color:var(--fg);white-space:nowrap}
+.src .ic{color:var(--muted);width:17px;height:17px}
+.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)} .t-mute{color:var(--muted)}
+.tile{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:17px;flex:none;background:color-mix(in srgb, var(--c) 15%, transparent);color:var(--c)}
+
+/* ── Overview ── */
+.grid-2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px;margin-top:18px}
+@media (max-width:1080px){.grid-2{grid-template-columns:minmax(0,1fr)}}
+.topo{overflow-x:auto;padding:4px 12px 14px}
+.topo svg{display:block;min-width:820px;width:100%;height:auto}
+.topo .n{fill:var(--surface);stroke:var(--line-strong)}
+.topo .n.core{fill:var(--surface-2);stroke:var(--accent)}
+.topo .mod{fill:var(--surface);stroke:var(--line)}
+.topo .t{fill:var(--fg);font:600 14px var(--font)}
+.topo .s{fill:var(--muted);font:400 12px var(--font)}
+.topo .h{fill:var(--muted);font:600 11.5px var(--font);letter-spacing:.08em}
+.topo .e{fill:none;stroke:var(--line-strong);stroke-width:1.6}
+.topo .e.live{stroke:var(--accent);stroke-dasharray:5 5;animation:flow 1.4s linear infinite}
+.topo .e.dash{stroke-dasharray:4 5}
+.topo .lbl{fill:var(--muted);font:500 11.5px var(--mono)}
+@keyframes flow{to{stroke-dashoffset:-20}}
+@media (prefers-reduced-motion: reduce){.topo .e.live{animation:none}}
+.attn{list-style:none;margin:0;padding:0 8px 8px}
+.attn li{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:10px}
+.attn li + li{border-top:1px solid var(--line)}
+.attn .ic{margin-top:2px}
+.attn b{display:block;font-weight:600}
+.attn span{color:var(--muted);font-size:14px}
+.attn button{margin-left:auto}
+.feed{list-style:none;margin:0;padding:0 20px 14px}
+.feed li{display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.feed li:first-child{border-top:0}
+.feed time{color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ── Apps ── */
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:18px}
+.app{display:flex;flex-direction:column}
+.app-h{display:flex;gap:14px;align-items:flex-start;padding:18px 20px 14px}
+.app-h h3{margin:0;font-size:19px;font-weight:700}
+.app-h p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.app-h .pill{margin-left:auto}
+.dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 16px;padding:4px 20px 16px;margin:0}
+.dl div{min-width:0}
+.dl dt{font-size:12.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.dl dd{margin:3px 0 0;font-weight:500;overflow-wrap:anywhere}
+@media (max-width:520px){.dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.app-ev{padding:0 20px 16px}
+.app-ev .lab{font-size:12.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.app-f{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line);margin-top:auto}
+.app-f .grow{flex:1}
+.banner{margin:0 20px 14px;padding:10px 12px;border-radius:9px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.banner.bad{background:var(--bad-soft);color:var(--bad)}
+.banner.info{background:var(--accent-soft);color:var(--accent)}
+.banner b{font-weight:600}
+.slot{border:1.5px dashed var(--line-strong);border-radius:13px;display:grid;place-items:center;text-align:center;padding:36px 24px;color:var(--muted);background:transparent;cursor:pointer;min-height:260px}
+.slot:hover{border-color:var(--accent);color:var(--accent)}
+.slot b{display:block;color:var(--fg);font-size:17px;margin:10px 0 4px}
+.contract{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;margin-bottom:18px}
+.contract .card{padding:18px 20px}
+.contract h3{margin:0 0 4px;font-size:17px}
+.contract p{margin:0 0 12px;color:var(--muted);font-size:14px}
+.ep{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.ep li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:baseline}
+.ep code{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere}
+.ep .m{font:600 11px var(--mono);padding:2px 6px;border-radius:4px;background:var(--accent-soft);color:var(--accent)}
+.ep span.d{grid-column:2;color:var(--muted);font-size:13.5px}
+.states{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.states .ic{width:14px;height:14px;color:var(--faint)}
+pre.code{background:var(--code-bg);color:var(--code-fg);font:13px/1.6 var(--mono);padding:16px 18px;border-radius:11px;overflow:auto;margin:0;max-height:520px}
+pre.code .k{color:var(--code-key)} pre.code .s{color:var(--code-str)}
+
+/* ── Matrix (role bindings / grants) ── */
+.mx select{appearance:none;-webkit-appearance:none;border:1px solid var(--line);border-radius:7px;padding:5px 26px 5px 9px;background:var(--surface) no-repeat right 8px center/12px;cursor:pointer;font-size:14px;min-width:150px}
+.mx td.r{position:relative}
+.mx .cv{position:absolute;pointer-events:none;width:14px;height:14px;margin:9px 0 0 -26px;color:var(--muted)}
+.mx select.none{color:var(--faint)}
+.note{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:14px;padding:0 20px 14px}
+
+/* ── Drawer & modal ── */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--bg);z-index:41;display:flex;flex-direction:column;box-shadow:-20px 0 60px -20px rgba(0,0,0,.35)}
+.d-h{display:flex;gap:14px;align-items:flex-start;padding:20px 24px 16px;padding-top:calc(20px + env(safe-area-inset-top,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.d-h h2{margin:0;font-size:21px}
+.d-h p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.d-h .x{margin-left:auto}
+.xbtn{width:36px;height:36px;border-radius:8px;border:0;background:var(--surface-2);display:grid;place-items:center;cursor:pointer;color:var(--fg);flex:none}
+.d-b{flex:1;overflow:auto;padding:20px 24px;display:grid;gap:18px;align-content:start}
+.d-f{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding:14px 24px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
+.d-f .grow{flex:1}
+.sec h3{margin:0 0 10px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.box table{min-width:0}
+.box th,.box td{padding:9px 10px}
+.box th{background:transparent;padding-top:0}
+.kv{display:grid;grid-template-columns:minmax(120px,max-content) minmax(0,1fr);gap:8px 18px;margin:0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.modal{position:fixed;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(580px,calc(100% - 32px));max-height:calc(100% - 48px);overflow:auto;background:var(--surface);border-radius:14px;box-shadow:0 30px 80px -20px rgba(0,0,0,.45)}
+.modal .d-h{border-radius:14px 14px 0 0;padding-top:20px}
+.modal .d-f{border-radius:0 0 14px 14px;padding-bottom:14px}
+.impact{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.impact li{display:flex;gap:10px;align-items:flex-start}
+.impact .ic{margin-top:2px;color:var(--muted)}
+.field{display:grid;gap:6px}
+.field > span{font-size:14px;font-weight:600}
+.field small{color:var(--muted);font-size:13px}
+.inp{border:1px solid var(--line-strong);border-radius:9px;padding:9px 12px;background:var(--surface);width:100%;font-size:15px}
+.inp:focus{outline:0;border-color:var(--accent)}
+.inp.mono{font-family:var(--mono);font-size:14px}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.err{color:var(--bad);font-size:14px}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px}
+.check small{display:block;color:var(--muted);font-size:13px}
+.radio-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.rcard{border:1.5px solid var(--line);border-radius:11px;padding:14px;background:var(--surface);cursor:pointer;text-align:left}
+.rcard[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.rcard b{display:block;margin-bottom:2px}
+.rcard span{color:var(--muted);font-size:13.5px}
+.secret{display:flex;gap:8px;align-items:center;background:var(--surface-2);border-radius:9px;padding:8px 8px 8px 12px}
+.secret code{flex:1;font-family:var(--mono);font-size:13.5px;overflow-wrap:anywhere}
+.steps{display:flex;gap:6px;padding:14px 24px;background:var(--hdr);overflow-x:auto}
+.step{display:flex;align-items:center;gap:8px;color:var(--hdr-muted);font-size:14px;white-space:nowrap;padding:6px 10px 6px 6px;border-radius:9px}
+.step .dot-badge{width:26px;height:26px;font-size:12.5px;background:rgba(255,255,255,.12);color:var(--hdr-fg)}
+.step.done .dot-badge{background:var(--mint);color:var(--mint-fg)}
+.step.cur{background:var(--hdr-active);color:var(--hdr-fg)}
+.step.cur .dot-badge{background:#fff;color:var(--hdr)}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.checks li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.checks li:first-child{border-top:0}
+.checks small{display:block;color:var(--muted);font-size:13px}
+.bar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .2s}
+.bar.ok i{background:var(--ok)}
+.prog{display:grid;grid-template-columns:130px minmax(0,1fr) 90px;gap:12px;align-items:center;padding:8px 0}
+.prog span:last-child{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.timeline{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.timeline li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:10px}
+.timeline small{color:var(--muted)}
+
+/* ── Toasts ── */
+.toasts{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;display:grid;gap:10px;width:min(400px,calc(100% - 32px))}
+.toast{background:var(--fg);color:var(--bg);border-radius:11px;padding:12px 14px;box-shadow:0 18px 40px -16px rgba(0,0,0,.5);display:flex;gap:10px;align-items:flex-start;font-size:14px;animation:tin .2s ease-out}
+.toast b{font-family:var(--mono);font-weight:500}
+.toast small{display:block;opacity:.75}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+@media (prefers-reduced-motion: reduce){.toast{animation:none}}
+@media (max-width:640px){
+  .head h1{font-size:26px}
+  .brand small{display:none}
+  .kpi .val{font-size:28px}
+  .prog{grid-template-columns:100px minmax(0,1fr) 70px}
+}
+
+/* ── Arak look for the work area (OpenMetadata ui-core-components / Untitled UI). The navy sidebar stays as it is. ── */
+body{font-size:14px}
+.maincol{min-width:0;display:flex;flex-direction:column}
+.maincol>main{width:100%;min-width:0;box-sizing:border-box}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;height:64px;padding:0 clamp(16px,3vw,32px);background:var(--surface);border-bottom:1px solid var(--line)}
+.topbar .grow{flex:1}
+.tsearch{display:flex;align-items:center;gap:8px;flex:0 1 480px;min-width:0;height:40px;padding:0 14px;border-radius:8px;background:var(--surface-2);border:1px solid transparent;color:var(--faint)}
+.tsearch .ic{order:2;width:18px;height:18px}
+.tsearch input{border:0;outline:0;background:transparent;width:100%;font-size:14px;color:var(--fg)}
+.tsearch input::placeholder{color:var(--muted)}
+.tsearch:focus-within{border-color:var(--accent-ring);background:var(--surface);box-shadow:var(--ring)}
+.topbar .iconbtn{position:relative;border:0;background:transparent;color:var(--muted);width:40px;height:40px;border-radius:8px}
+.topbar .iconbtn:hover{background:var(--surface-2);color:var(--fg)}
+.topbar .iconbtn .ic{width:20px;height:20px}
+.topbar .iconbtn i{position:absolute;top:3px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:var(--bad);color:#fff;font:600 11px/18px var(--font);font-style:normal}
+.tme{display:flex;align-items:center;gap:10px;padding-left:8px;min-width:0}
+.tme .avatar{background:var(--surface-2);color:var(--muted);border:1px solid var(--line);font-size:13px}
+.tme b{display:block;font-size:14px;font-weight:600;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tme small{display:block;font-size:12px;color:var(--muted)}
+main.wrap{padding-top:32px}
+.head{align-items:center;margin-bottom:24px}
+.head h1{font-size:30px;font-weight:600;line-height:1.25;margin:0 0 8px;letter-spacing:-.02em}
+.head .desc{margin:0 0 12px;max-width:720px;color:var(--muted);font-size:16px;line-height:1.5;text-wrap:pretty}
+.meta{gap:4px 20px;font-size:13.5px}
+.meta b{font-weight:500}
+.btn{border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;background:var(--surface);border-color:var(--line-strong);color:var(--fg-2);box-shadow:var(--xs)}
+.btn:hover{background:var(--surface-2);filter:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.ghost{background:var(--surface)}
+.btn.danger{color:var(--bad-text)}
+.btn.danger.solid{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.sm{padding:6px 12px;font-size:13px}
+.seg{display:flex;width:100%;gap:24px;padding:0;margin-bottom:24px;background:transparent;border-radius:0;border-bottom:1px solid var(--line);flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.seg button{flex:none;white-space:nowrap}
+.seg button{padding:10px 2px 11px;border-radius:0;font-size:14px;font-weight:600;color:var(--muted)}
+.seg button .ic{width:16px;height:16px}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:transparent;color:var(--accent-text);box-shadow:inset 0 -2px 0 var(--accent)}
+.kpis{gap:20px;margin-bottom:24px}
+.kpi{border-radius:12px;padding:20px;box-shadow:var(--xs)}
+.kpi .lbl{font-size:14px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted)}
+.kpi .lbl .ic{display:none}
+.kpi .val{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:12px 0 6px}
+.kpi .sub{font-size:12.5px}
+.card{border-radius:12px;box-shadow:var(--xs)}
+.card-h{align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card-h h2{font-size:16px}
+.card-h p{font-size:13.5px}
+.attn li + li{border-top:0}
+.attn{padding:8px}
+th{background:var(--surface);color:var(--muted);font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;padding:12px 20px;border-bottom:1px solid var(--line)}
+td{padding:16px 20px}
+tbody tr:hover td{background:var(--surface-2)}
+.cell-sub{font-size:12.5px}
+.search,.fsel{border-radius:8px;border-color:var(--line-strong);box-shadow:var(--xs);min-height:40px}
+.search input,.fsel{font-size:14px}
+.fsel select{font-weight:400;color:var(--fg)}
+.inp{border-radius:8px;border-color:var(--line-strong);box-shadow:var(--xs);font-size:14px}
+.search:focus-within,.fsel:focus-within,.inp:focus{border-color:var(--accent-ring);box-shadow:var(--ring)}
+.pill{font-size:12px;font-weight:500;padding:2px 9px 2px 8px;border:1px solid var(--line)}
+.pill::before{width:6px;height:6px}
+.pill.ok{border-color:var(--ok-line);color:var(--ok-text)}
+.pill.warn{border-color:var(--warn-line);color:var(--warn-text)}
+.pill.bad{border-color:var(--bad-line);color:var(--bad-text)}
+.pill.info{border-color:var(--accent-line);color:var(--accent-text)}
+.pill.mute{color:var(--fg-2)}
+.tag{font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;background:var(--surface);border:1px solid var(--line-strong);color:var(--fg-2);border-radius:6px;padding:1px 7px}
+.chip{border-radius:16px;padding:2px 9px}
+.sample{text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;border-radius:16px;padding:3px 10px;border:1px solid var(--warn-line);background:var(--warn-soft);color:var(--warn-text);white-space:nowrap}
+.sample.live{border-color:var(--ok-line);background:var(--ok-soft);color:var(--ok-text)}
+.banner{border-radius:12px;border:1px solid transparent}
+.banner.warn{border-color:var(--warn-line);color:var(--warn-text)}
+.banner.bad{border-color:var(--bad-line);color:var(--bad-text)}
+.banner.info{border-color:var(--accent-line);color:var(--accent-text)}
+.t-ok{color:var(--ok-text)} .t-warn{color:var(--warn-text)} .t-bad{color:var(--bad-text)}
+.sec h3,.dl dt,.app-ev .lab{letter-spacing:0;text-transform:none}
+.sec h3{font-size:14px;color:var(--fg)}
+.dl dt,.app-ev .lab{font-size:12.5px;font-weight:500}
+.app-h h3{font-size:18px;font-weight:600}
+.drawer{background:var(--surface-2)}
+.box,.rcard,.slot{border-radius:12px}
+.modal{border-radius:12px}
+.login-side{background:#fafafa}
+:root[data-theme="dark"] .login-side{background:var(--surface-2)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login-side{background:var(--surface-2)}}
+/* Overview hero, like Arak's Home */
+.hero{position:relative;overflow:hidden;border-radius:16px;padding:36px 32px 32px;margin-bottom:24px;color:#fff;background:linear-gradient(120deg,#1849a9 0%,#1570ef 55%,#2e90fa 100%)}
+.hero-in{position:relative;max-width:720px}
+.hero-k{font-size:14px;font-weight:600;opacity:.92}
+.hero h1{font-size:30px;font-weight:600;line-height:1.25;letter-spacing:-.02em;margin:6px 0 10px}
+.hero p{margin:0;font-size:16px;line-height:1.5;opacity:.92;text-wrap:pretty}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 24px}
+.hero-meta span{font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.18)}
+.hero-a{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hero .btn.white{background:#fff;border-color:#fff;color:#182230}
+.hero .btn.white:hover{background:#f2f4f7}
+.hero .btn.onhero{background:transparent;border-color:transparent;box-shadow:none;color:#fff;padding-inline:10px}
+.hero .btn.onhero:hover{background:rgba(255,255,255,.14)}
+.hero-art{position:absolute;right:-24px;bottom:-70px;width:320px;height:320px;opacity:.16;pointer-events:none}
+.hero-art .ic{width:100%;height:100%;stroke-width:1.1;color:#fff}
+/* Sidebar, Arak-style rows on the navy background */
+.shell{grid-template-columns:272px minmax(0,1fr)}
+.side{padding:18px 12px 14px}
+.brand .logo{width:40px;height:40px;border-radius:10px}
+.brand b{font-size:18px;font-weight:600}
+.brand small{font-size:12.5px}
+.envbtn{padding:8px 12px;font-size:14px;border-radius:8px;background:rgba(255,255,255,.04)}
+.grp-l{font-size:11.5px;font-weight:600;letter-spacing:.08em;padding:22px 14px 8px}
+.nav{gap:2px}
+.navcard{gap:12px;height:44px;padding:0 14px;border-radius:8px;background:transparent;color:var(--hdr-muted);font-size:15px;font-weight:500;transition:background .15s,color .15s}
+.navcard > .ic{width:20px;height:20px;flex:none;stroke-width:1.75}
+.navcard .nl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navcard:hover{background:rgba(255,255,255,.07);color:#fff}
+.navcard[aria-current="page"]{background:#1570ef;color:#fff;box-shadow:none}
+.navcard:focus-visible{outline:2px solid #84caff;outline-offset:1px}
+.nb{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:99px;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;background:#f04438}
+.nb.warn{background:#f79009}
+.navcard[aria-current="page"] .nb{background:#fff;color:#1570ef}
+.navcard.mini{height:40px;padding:0 12px;gap:12px}
+.navcard.mini .tile{width:22px;height:22px;font-size:11px;border-radius:6px}
+.navcard.mini .go{margin-left:0;opacity:0;transition:opacity .15s}
+.navcard.mini:hover .go,.navcard.mini:focus-visible .go{opacity:1}
+.side-foot{border-top:1px solid var(--hdr-line);margin-top:auto;padding:14px 4px 0}
+.side-foot .me{background:transparent;padding:0}
+@media (hover:none){.navcard.mini .go{opacity:1}}
+.tile[data-logo]{background:transparent !important;padding:0}
+.tile[data-logo] img{width:100%;height:100%;object-fit:contain;display:block}
+/* Logos sit on a white chip where the background is dark (navy sidebar, dark mode) */
+.navcard.mini .tile[data-logo]{background:#fff !important;padding:2px;width:24px;height:24px}
+:root[data-theme="dark"] .tile[data-logo]{background:#fff !important;padding:5px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tile[data-logo]{background:#fff !important;padding:5px}}
+@keyframes page-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.page-enter{animation:page-enter 320ms cubic-bezier(.16,1,.3,1) both}
+@media (prefers-reduced-motion: reduce){.page-enter{animation:none}}
+@media (max-width:760px){.hero-art{display:none}.hero{padding:26px 20px}.hero h1{font-size:24px}}
+@media (max-width:640px){.tme > div,.topbar .sample{display:none}.tsearch{flex:1}.head h1{font-size:24px}}
+</style>
+
+<div id="app"></div>
+<div id="layer"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ───────────── Icons ───────────── */
+const I = {
+  hub:'<circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="m5.6 6.3 4.3 3.9M18.4 6.3l-4.3 3.9M5.6 17.7l4.3-3.9M18.4 17.7l-4.3-3.9"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>', chev:'<path d="m6 9 6 6 6-6"/>', search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  plus:'<path d="M5 12h14M12 5v14"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-14.93 1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user:'<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  plug:'<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>', gauge:'<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  db:'<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+  copy:'<rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  trash:'<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  pause:'<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  play:'<path d="m6 3 14 9-14 9V3z"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  file:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2M14 17l2-2-2-2"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  server:'<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/>',
+  book:'<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+  arrow:'<path d="M5 12h14M12 5l7 7-7 7"/>', clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  zap:'<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  menu:'<path d="M4 6h16M4 12h16M4 18h16"/>', chevr:'<path d="m9 18 6-6-6-6"/>',
+  external:'<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  send:'<path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.64l-19 6.5a.5.5 0 0 0-.03.94l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/>',
+  home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1Z"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+};
+const ic = (n, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]||''}</svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => Number(n).toLocaleString('en-US');
+const $ = s => document.querySelector(s);
+const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+
+/* ───────────── Sample data ───────────── */
+let SEQ = 48213;
+const T0 = Date.now();
+const clock = () => { const d = new Date(Date.UTC(2026,9,13,15,12,5) + (Date.now()-T0)); return d.toISOString().slice(11,19); };
+
+const APPS = [
+  { key:'arak', name:'Arak', purpose:'Data Access Control', kind:'App', version:'2.3.0', baseUrl:'https://arak.internal', mode:'webhook', status:'active', hb:'12 s ago', applied:48213, users:1180, owner:'data-governance@example.co.th',
+    roles:[['admin','Arak Admin'],['steward','Data Steward'],['requester','Access Requester']], deps:['openmetadata'],
+    subs:['user.*','group.*','rolebinding.*','connection.*','app.*','sync.*'], pub:['arak.access.granted','arak.access.revoked'], attrs:['username','email','displayName','department','manager'],
+    provides:['arak:policies.read','arak:requests.write'], consumes:[] },
+  { key:'prajak', name:'Prajak', purpose:'Data Quality', kind:'App', version:'1.8.2', baseUrl:'https://prajak.internal', mode:'webhook', status:'active', hb:'8 s ago', applied:48176, users:312, owner:'data-quality@example.co.th',
+    roles:[['admin','DQ Admin'],['editor','Rule Editor'],['viewer','Viewer']], deps:['openmetadata'],
+    subs:['user.*','group.*','rolebinding.*','connection.*','app.*','sync.*'], pub:['prajak.run.failed'], attrs:['username','email','displayName'],
+    provides:[], consumes:['arak:policies.read'] },
+  { key:'openmetadata', name:'OpenMetadata', purpose:'Metadata catalog · run by Bancha adapter', kind:'Adapter', version:'1.5.4', baseUrl:'https://openmetadata.internal', mode:'adapter', status:'active', hb:'5 s ago', applied:48213, users:1201, owner:'data-platform@example.co.th',
+    roles:[['data-steward','DataSteward'],['data-consumer','DataConsumer']], deps:[],
+    subs:['user.*','group.*','rolebinding.*','connection.*'], pub:[], attrs:['username','email','displayName'], provides:[], consumes:[] },
+];
+const REMOVED = [];
+
+const GROUPS = [
+  { name:'DG-Platform-Admins', src:'Azure AD', members:6,   desc:'Platform and security administrators', bind:{arak:'admin', prajak:'admin', openmetadata:'data-steward'}, changed:'02 Oct 2026' },
+  { name:'DG-Stewards',        src:'Azure AD', members:24,  desc:'Domain data stewards',                bind:{arak:'steward', prajak:'editor', openmetadata:'data-steward'}, changed:'13 Oct 2026 · 22:10' },
+  { name:'DG-Data-Engineers',  src:'Azure AD', members:38,  desc:'Pipeline and platform engineers',     bind:{arak:'requester', prajak:'editor', openmetadata:'data-steward'}, changed:'09 Oct 2026' },
+  { name:'DQ-Rule-Owners',     src:'Azure AD', members:19,  desc:'Owners of data quality rules',        bind:{prajak:'editor'}, changed:'13 Oct 2026 · 22:02' },
+  { name:'DG-Analysts-Finance',src:'Azure AD', members:112, desc:'Finance analysts',                    bind:{arak:'requester', prajak:'viewer', openmetadata:'data-consumer'}, changed:'11 Oct 2026' },
+  { name:'DG-Analysts-Risk',   src:'Azure AD', members:87,  desc:'Risk analysts',                       bind:{arak:'requester', prajak:'viewer', openmetadata:'data-consumer'}, changed:'07 Oct 2026' },
+  { name:'BR-Branch-Reporting',src:'LDAP',     members:32,  desc:'Branch reporting users (on-prem AD)', bind:{arak:'requester', openmetadata:'data-consumer'}, changed:'13 Oct 2026 · 21:58' },
+  { name:'svc-integration',    src:'Local',    members:4,   desc:'Service accounts for scheduled jobs',  bind:{prajak:'editor'}, changed:'28 Sep 2026' },
+];
+
+const mkU = (name, user, src, dept, groups, extra={}) => ({ name, user, email:`${user}@example.co.th`, src, dept, groups, status:'active', ver: 4, seq: 47800,
+  sync: src==='Azure AD' ? '22:10' : src==='LDAP' ? '21:58' : 'managed here', oid: src==='Azure AD' ? crypto.randomUUID() : src==='LDAP' ? `CN=${name},OU=Branches,DC=example,DC=local` : '—', ...extra });
+const USERS = [
+  mkU('Somchai Prasert','somchai.p','Azure AD','Data Governance',['DG-Stewards','DG-Analysts-Finance'],{ver:12, seq:48213}),
+  mkU('Sakan Punyanon','sakan.pu','Azure AD','Data Platform',['DG-Platform-Admins','DG-Data-Engineers'],{ver:9, seq:48120, email:'sakan_pu@mfec.co.th'}),
+  mkU('Anan Chaiyaporn','anan.c','Azure AD','Data Engineering',['DG-Data-Engineers','DQ-Rule-Owners'],{ver:7}),
+  mkU('Kanokwan Srisuk','kanokwan.s','Azure AD','Finance',['DG-Analysts-Finance']),
+  mkU('Thanawat Boonmee','thanawat.b','Azure AD','Risk',['DG-Analysts-Risk']),
+  mkU('Napat Rattanakul','napat.r','Azure AD','Data Governance',['DG-Stewards','DQ-Rule-Owners'],{ver:6, seq:48212}),
+  mkU('Siriporn Kaewmanee','siriporn.k','LDAP','Branch Operations',['BR-Branch-Reporting']),
+  mkU('Wichai Thongdee','wichai.t','Azure AD','Risk',['DG-Analysts-Risk'],{status:'disabled', ver:9, seq:48209, note:'Removed from Azure AD on 13 Oct 2026 · purged after 12 Nov 2026'}),
+  mkU('Arisa Jantarasorn','arisa.j','Azure AD','Finance',['DG-Analysts-Finance','DG-Stewards']),
+  mkU('Prasit Meesuk','prasit.m','LDAP','Branch Operations',['BR-Branch-Reporting']),
+  mkU('Chutima Phromma','chutima.p','Azure AD','Data Quality',['DQ-Rule-Owners'],{ver:3, seq:48211}),
+  mkU('Natthapong Inthasorn','natthapong.i','Azure AD','IT Security',['DG-Platform-Admins']),
+  mkU('Marketing Intern','intern.mkt','Azure AD','Marketing',[]),
+  mkU('svc-prajak-runner','svc.prajak','Local','Service account',['svc-integration']),
+  mkU('break-glass-admin','bg.admin','Local','Bancha admin (emergency)',[]),
+];
+
+const P = (p, u, rot) => ({ p, u, rot });
+const CONNS = [
+  { id:'dwh-prod', cat:'data_source', type:'PostgreSQL', host:'10.6.150.40', port:5432, db:'dwh', owner:'DG-Data-Engineers',
+    profiles:[P('admin','arak_admin',12),P('read','dq_reader',12),P('metadata','om_reader',12)], grants:{arak:['admin'],prajak:['read'],openmetadata:['metadata']}, test:{ok:true, ms:38, at:'22:05'} },
+  { id:'core-banking', cat:'data_source', type:'Oracle', host:'10.6.150.21', port:1521, db:'CBSPRD', owner:'DG-Platform-Admins',
+    profiles:[P('admin','ARAK_GRANTOR',82),P('metadata','OM_META',82)], grants:{arak:['admin'],openmetadata:['metadata']}, test:{ok:true, ms:61, at:'22:05'} },
+  { id:'crm-sqlserver', cat:'data_source', type:'SQL Server', host:'10.6.150.55', port:1433, db:'CRM', owner:'DG-Data-Engineers',
+    profiles:[P('read','dq_reader',30),P('metadata','om_reader',30)], grants:{prajak:['read'],openmetadata:['metadata']}, test:{ok:false, ms:null, at:'22:05', err:'Login timeout expired after 15 s'} },
+  { id:'snowflake-analytics', cat:'data_source', type:'Snowflake', host:'xy12345.ap-southeast-1', port:443, db:'ANALYTICS', owner:'DG-Data-Engineers',
+    profiles:[P('admin','ARAK_SECURITYADMIN',20),P('read','PRAJAK_READER',20),P('metadata','OM_INGEST',20)], grants:{arak:['admin'],prajak:['read'],openmetadata:['metadata']}, test:{ok:true, ms:214, at:'22:05'} },
+  { id:'lakehouse', cat:'data_source', type:'Databricks', host:'adb-4413.azuredatabricks.net', port:443, db:'main', owner:'DG-Data-Engineers',
+    profiles:[P('read','sp-prajak',44),P('metadata','sp-openmetadata',44)], grants:{prajak:['read'],openmetadata:['metadata']}, test:{ok:true, ms:182, at:'22:05'} },
+  { id:'trino-adhoc', cat:'data_source', type:'Trino', host:'10.6.150.80', port:8080, db:'hive', owner:'DG-Data-Engineers',
+    profiles:[P('read','prajak',5)], grants:{prajak:['read']}, test:{ok:true, ms:22, at:'22:05'} },
+  { id:'hr-mysql', cat:'data_source', type:'MySQL', host:'10.6.150.66', port:3306, db:'hr', owner:'DG-Platform-Admins',
+    profiles:[P('metadata','om_reader',61)], grants:{openmetadata:['metadata']}, test:{ok:false, ms:null, at:'22:05', err:'Host 10.6.150.66 unreachable (no route)'} },
+  { id:'datamart-risk', cat:'data_source', type:'PostgreSQL', host:'10.6.150.41', port:5432, db:'risk', owner:'DG-Analysts-Risk',
+    profiles:[P('admin','arak_admin',97),P('read','dq_reader',97),P('metadata','om_reader',97)], grants:{arak:['admin'],prajak:['read'],openmetadata:['metadata']}, test:{ok:true, ms:41, at:'22:05'} },
+  { id:'openmetadata-prod', cat:'metadata', type:'OpenMetadata', host:'https://openmetadata.internal', port:8585, db:'—', owner:'DG-Platform-Admins',
+    profiles:[P('read','arak-bot',33),P('write','prajak-bot',33),P('admin','ingestion-bot',33)], grants:{arak:['read'],prajak:['write'],openmetadata:['admin']}, test:{ok:true, ms:57, at:'22:05'} },
+  { id:'azure-ad-corp', cat:'directory', type:'Azure AD', host:'login.microsoftonline.com', port:443, db:'example.onmicrosoft.com', owner:'DG-Platform-Admins',
+    profiles:[P('default','bancha-directory-sync (app reg)',41)], grants:{}, test:{ok:true, ms:120, at:'22:10'},
+    dir:{ filter:"startsWith(displayName,'DG-') or startsWith(displayName,'DQ-')", every:'15 min · delta query', last:'13 Oct 2026 · 22:10', users:1240, groups:38, changed:3 } },
+  { id:'ldap-branch', cat:'directory', type:'LDAP', host:'ldaps://10.6.150.10', port:636, db:'OU=Branches,DC=example,DC=local', owner:'DG-Platform-Admins',
+    profiles:[P('default','CN=svc-bancha-bind',58)], grants:{}, test:{ok:true, ms:33, at:'21:58'},
+    dir:{ filter:'(memberOf=CN=BR-Branch-Reporting,OU=Groups,…)', every:'30 min · full compare', last:'13 Oct 2026 · 21:58', users:32, groups:1, changed:0 } },
+];
+
+const FEED = [
+  { seq:48213, type:'user.updated', subject:'users/somchai.p', v:12, actor:'azure-ad-corp sync', time:'22:10:22', n:3 },
+  { seq:48212, type:'group.membership.changed', subject:'groups/DG-Stewards', v:31, actor:'azure-ad-corp sync', time:'22:10:21', n:3 },
+  { seq:48211, type:'rolebinding.granted', subject:'prajak/editor ← DQ-Rule-Owners', v:1, actor:'sakan.pu', time:'22:02:47', n:1 },
+  { seq:48210, type:'connection.updated', subject:'connections/crm-sqlserver', v:7, actor:'anan.c', time:'21:55:10', n:2 },
+  { seq:48209, type:'user.disabled', subject:'users/wichai.t', v:9, actor:'azure-ad-corp sync', time:'21:40:03', n:3 },
+  { seq:48208, type:'group.membership.changed', subject:'groups/BR-Branch-Reporting', v:14, actor:'ldap-branch sync', time:'21:28:40', n:2 },
+  { seq:48207, type:'connection.secret.rotated', subject:'connections/dwh-prod', v:14, actor:'rotation policy', time:'21:30:00', n:3 },
+];
+const D = (seq, type, subject, app, status, attempts, ms, time, err) => ({ id:'dlv_'+seq+app.slice(0,2), seq, type, subject, app, status, attempts, ms, time, err });
+const DLV = [
+  D(48213,'user.updated','users/somchai.p','arak','delivered',1,142,'22:10:22'),
+  D(48213,'user.updated','users/somchai.p','openmetadata','delivered',1,388,'22:10:23'),
+  D(48213,'user.updated','users/somchai.p','prajak','retrying',3,null,'22:10:22','503 Service Unavailable · next attempt 22:31'),
+  D(48212,'group.membership.changed','groups/DG-Stewards','arak','delivered',1,96,'22:10:21'),
+  D(48212,'group.membership.changed','groups/DG-Stewards','openmetadata','delivered',1,410,'22:10:22'),
+  D(48212,'group.membership.changed','groups/DG-Stewards','prajak','retrying',3,null,'22:10:21','503 Service Unavailable · next attempt 22:31'),
+  D(48211,'rolebinding.granted','prajak/editor ← DQ-Rule-Owners','prajak','delivered',1,120,'22:02:47'),
+  D(48210,'connection.updated','connections/crm-sqlserver','prajak','delivered',1,131,'21:55:10'),
+  D(48210,'connection.updated','connections/crm-sqlserver','openmetadata','delivered',2,602,'21:55:41'),
+  D(48209,'user.disabled','users/wichai.t','arak','delivered',1,88,'21:40:03'),
+  D(48209,'user.disabled','users/wichai.t','prajak','delivered',1,97,'21:40:03'),
+  D(48209,'user.disabled','users/wichai.t','openmetadata','delivered',1,355,'21:40:04'),
+  D(48102,'connection.secret.rotated','connections/datamart-risk','prajak','dead',8,null,'12 Oct · 21:30','Timeout after 10 s on all 8 attempts'),
+];
+const AUDIT = [
+  { time:'22:10', actor:'system', action:'directory.sync', target:'azure-ad-corp', detail:'1,240 users · 38 groups · 3 changed' },
+  { time:'22:05', actor:'system', action:'connection.test', target:'all connections', detail:'9 passed · 2 failed (crm-sqlserver, hr-mysql)' },
+  { time:'22:02', actor:'sakan.pu', action:'rolebinding.grant', target:'prajak/editor', detail:'Granted to group DQ-Rule-Owners' },
+  { time:'21:58', actor:'system', action:'directory.sync', target:'ldap-branch', detail:'32 users · 1 group · no changes' },
+  { time:'21:55', actor:'anan.c', action:'connection.update', target:'crm-sqlserver', detail:'host 10.6.150.54 → 10.6.150.55' },
+  { time:'21:30', actor:'system', action:'connection.rotate', target:'dwh-prod', detail:'Profiles admin, read, metadata rotated by policy' },
+  { time:'20:14', actor:'natthapong.i', action:'app.credentials.rotate', target:'arak', detail:'Webhook secret rotated · old secret valid until 14 Oct 20:14' },
+  { time:'19:48', actor:'sakan.pu', action:'connection.grant', target:'snowflake-analytics', detail:'Profile read granted to Prajak' },
+];
+
+/* ───────────── State ───────────── */
+const LIVE = { on:false, at:'' };   // true once server/server.js answers with real connections
+const PAGES_ORDER = ['myapps','overview','identity','connections','apps','sync'];
+const state = {
+  page: null,
+  session: null, handoff: null, menuOpen: false,
+  login: { mode:'choose', target: null, user: '', err: '' },
+  sub: { identity:'users', connections:'data_source', apps:'registry', sync:'deliveries' },
+  q: { users:'', groups:'', conns:'', dlv:'', audit:'' },
+  f: { uSrc:'all', uApp:'all', uStatus:'all', cType:'all', cStatus:'all', dApp:'all', dStatus:'all' },
+  layer: null, wiz: null,
+};
+try { const h = location.hash.slice(1); if (PAGES_ORDER.includes(h)) state.page = h; } catch {}
+// An app that sends an unauthenticated user here adds ?app=<key>; after sign-in the user goes straight back into it.
+try { const t = new URLSearchParams(location.search).get('app'); if (t) state.login.target = t; } catch {}
+try { const s = JSON.parse(sessionStorage.getItem('bancha-session') || 'null'); if (s && USERS.some(u => u.user === s.user)) state.session = s; } catch {}
+
+/* ───────────── Session ───────────── */
+const ADMIN_GROUP = 'DG-Platform-Admins';
+const METHOD = { azure:'Azure AD SSO', ldap:'LDAP password', local:'Local password' };
+const REDIRECT = { arak:'/auth/callback', prajak:'/oauth/callback', openmetadata:'/callback' };
+const me = () => state.session && USERS.find(u => u.user === state.session.user);
+const isAdmin = u => !!u && (u.groups.includes(ADMIN_GROUP) || u.user === 'bg.admin');
+const initials = n => n.split(/[\s.-]+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
+const isDark = () => { const r = document.documentElement; return r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+function saveSession(){ try { if (state.session) sessionStorage.setItem('bancha-session', JSON.stringify(state.session)); else sessionStorage.removeItem('bancha-session'); } catch {} }
+
+/* ───────────── Derived ───────────── */
+const liveApps = () => APPS.filter(a => a.status !== 'removed');
+const app = k => APPS.find(a => a.key === k) || REMOVED.find(a => a.key === k);
+const lag = a => Math.max(0, SEQ - a.applied);
+const roleName = (ak, rk) => { const a = app(ak); const r = a && a.roles.find(x => x[0] === rk); return r ? r[1] : rk; };
+function userAccess(u){
+  const out = {};
+  liveApps().forEach(a => {
+    const rank = a.roles.map(r => r[0]); let best = null, via = null;
+    u.groups.forEach(g => { const grp = GROUPS.find(x => x.name === g); const r = grp && grp.bind[a.key];
+      if (r && (best === null || rank.indexOf(r) < rank.indexOf(best))) { best = r; via = g; } });
+    if (best) out[a.key] = { role: best, via };
+  });
+  return out;
+}
+const isFailing = c => !c.test.ok && !(c.missing && c.missing.length);
+const secretAge = c => c.live ? 0 : Math.max(...c.profiles.map(p => p.rot));
+function connStatus(c){
+  if (c.missing && c.missing.length && !c.test.ok) return ['warn','Needs credentials'];
+  if (!c.test.ok) return ['bad','Failing'];
+  const age = secretAge(c);
+  if (age > 90) return ['warn','Rotate secret'];
+  return ['ok','Healthy'];
+}
+const grantCount = c => Object.values(c.grants).reduce((s, v) => s + v.length, 0);
+function attention(){
+  const out = [];
+  CONNS.filter(isFailing).forEach(c => out.push({ tone:'bad', icon:'plug', title:`${c.id} failed its connection test`, sub:c.test.err, act:'conn', id:c.id }));
+  CONNS.filter(c => c.test.ok && secretAge(c) > 90).forEach(c => out.push({ tone:'warn', icon:'key', title:`${c.id} secrets are ${secretAge(c)} days old`, sub:'Rotation policy is 90 days', act:'conn', id:c.id }));
+  const dead = DLV.filter(d => d.status === 'dead');
+  if (dead.length) out.push({ tone:'bad', icon:'alert', title:`${dead.length} delivery in dead letter`, sub:`${dead.map(d => app(d.app)?.name + ' · ' + d.type).join(', ')}`, act:'gosync', id:'deliveries' });
+  liveApps().filter(a => a.status === 'active' && lag(a) > 20).forEach(a => out.push({ tone:'warn', icon:'clock', title:`${a.name} is ${lag(a)} events behind`, sub:'Webhook returns 503. Bancha keeps retrying.', act:'gosync', id:'deliveries' }));
+  liveApps().filter(a => a.status === 'deregistering').forEach(a => out.push({ tone:'warn', icon:'logout', title:`${a.name} is deregistering`, sub:`Waiting for purge confirmation · ${a.grace}`, act:'goapps', id:'' }));
+  const noAccess = USERS.filter(u => u.status === 'active' && !Object.keys(userAccess(u)).length && u.src !== 'Local');
+  if (noAccess.length) out.push({ tone:'mute', icon:'user', title:`${noAccess.length} active user has no app access`, sub:noAccess.map(u => u.name).join(', ') + ' (sample)', act:'gousers', id:'' });
+  return out;
+}
+
+/* ───────────── Building blocks ───────────── */
+const pill = (tone, text) => `<span class="pill ${tone}">${esc(text)}</span>`;
+const STATUS = { active:['ok','Active'], degraded:['warn','Degraded'], suspended:['mute','Suspended'], deregistering:['warn','Deregistering'], pending:['info','Pending approval'], provisioning:['info','Provisioning'], removed:['mute','Removed'] };
+const appPill = a => { let [t, l] = STATUS[a.status] || ['mute', a.status]; if (a.status === 'active' && lag(a) > 20) { t = 'warn'; l = 'Lagging'; } return pill(t, l); };
+const appChip = (k, text) => `<span class="chip" style="--c:var(--c-${k})"><i></i>${esc(text)}</span>`;
+const srcIcon = s => s === 'Azure AD' ? 'cloud' : s === 'LDAP' ? 'server' : 'user';
+const src = s => `<span class="src">${ic(srcIcon(s))}${esc(s)}</span>`;
+const btn = (icon, label, act, cls='', data='') => `<button class="btn ${cls}" data-act="${act}" ${data}>${icon ? ic(icon) : ''}${esc(label)}</button>`;
+const LOGO = {
+  arak:'data:image/png;base64,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',
+  prajak:'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20d%3D%22M9%205.5%2026.5%2015a1.2%201.2%200%200%201%200%202L9%2026.5A1.3%201.3%200%200%201%207%2025.4V6.6A1.3%201.3%200%200%201%209%205.5Z%22%20fill%3D%22%231f2a44%22%20stroke%3D%22%231f2a44%22%20stroke-width%3D%223%22%20stroke-linejoin%3D%22round%22/%3E%3Crect%20x%3D%221.5%22%20y%3D%2213%22%20width%3D%224%22%20height%3D%226%22%20rx%3D%221.2%22%20fill%3D%22%231f2a44%22/%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%2216%22%20r%3D%225%22%20fill%3D%22%23fff%22/%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%2216%22%20r%3D%223.6%22%20fill%3D%22%23ef3e42%22/%3E%3C/svg%3E',
+  openmetadata:'data:image/png;base64,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',
+};
+const tile = a => LOGO[a.key] ? `<span class="tile" data-logo style="--c:var(--c-${a.key})"><img src="${LOGO[a.key]}" alt=""></span>` : `<span class="tile" style="--c:var(--c-${a.key})">${esc(a.name[0])}</span>`;
+
+const DESC = {
+  'My apps': 'Every app you can open with this one sign-in. Your role in each comes from the groups you are in.',
+  'Users & groups': 'One list of people and groups, synced from Azure AD and LDAP plus a few local accounts. Role bindings decide what each group can do in each app.',
+  'Connections': 'Data sources, OpenMetadata and user directories, kept in one place. Apps get host and database in events and pull the credential for the profile they were granted.',
+  'App registry': 'Apps that plug into Bancha through contract v1: a manifest, three endpoints and client credentials. Register, suspend and remove them here.',
+  'Delivery and audit': 'Every change goes out as an event with a sequence number. Follow each delivery, retry the ones that failed and see who changed what.',
+};
+function pageHead({ eyebrow, title, meta, actions, seg }){
+  return `<div class="head"><div><h1>${esc(title)}</h1>${DESC[title] ? `<p class="desc">${esc(DESC[title])}</p>` : ''}<div class="meta">${meta.map(([k, v]) => `<span>${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div></div>
+  <div class="actions">${actions || ''}</div></div>${seg || ''}`;
+}
+function seg(page, items){
+  return `<div class="seg" role="group" aria-label="View">${items.map(([id, label, icon]) =>
+    `<button id="seg-${page}-${id}" data-act="sub" data-page="${page}" data-id="${id}" aria-pressed="${state.sub[page] === id}">${ic(icon)}${esc(label)}</button>`).join('')}</div>`;
+}
+const kpis = list => `<div class="kpis">${list.map(k => `<div class="kpi ${k.tone || ''}"><div class="lbl">${ic(k.icon)}${esc(k.label)}</div><div class="val">${k.value}</div><div class="sub">${k.sub}</div></div>`).join('')}</div>`;
+const search = (id, key, ph) => `<label class="search" for="${id}">${ic('search')}<input id="${id}" data-q="${key}" value="${esc(state.q[key])}" placeholder="${esc(ph)}" autocomplete="off"></label>`;
+const fsel = (id, label, key, opts) => `<label class="fsel" for="${id}"><span>${esc(label)}</span><select id="${id}" data-f="${key}">${opts.map(([v, t]) => `<option value="${esc(v)}" ${state.f[key] === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>${ic('chev')}</label>`;
+const match = (q, ...fields) => !q || fields.join(' ').toLowerCase().includes(q.toLowerCase());
+
+/* ───────────── Nav ───────────── */
+function navHTML(){
+  const att = attention().filter(a => a.tone !== 'mute').length;
+  const failing = CONNS.filter(isFailing).length;
+  const due = CONNS.filter(c => c.test.ok && secretAge(c) > 90).length;
+  const dead = DLV.filter(d => d.status === 'dead').length, retrying = DLV.filter(d => d.status === 'retrying').length;
+  const la = liveApps(), active = la.filter(a => a.status === 'active').length, other = la.length - active;
+  const items = [
+    ['overview','Overview','home', `Feed seq ${fmt(SEQ)}`, att ? ['warn', att] : null],
+    ['identity','Users & groups','users', '1,284 users · 46 groups', null],
+    ['connections','Connections','plug', `${CONNS.length} connections · ${failing} failing`, failing ? ['bad', failing] : due ? ['warn', due] : null],
+    ['apps','App registry','server', `${active} active${other ? ' · ' + other + ' in transition' : ''} · contract v1`, other ? ['warn', other] : null],
+    ['sync','Distribution','send', `${dead} dead letter · ${retrying} retrying`, dead ? ['bad', dead] : retrying ? ['warn', retrying] : null],
+  ];
+  const u = me(), admin = isAdmin(u), acc = userAccess(u), nAcc = Object.keys(acc).length;
+  const card = ([id, title, icn, sub, badge]) => `<button class="navcard" id="nav-${id}" data-act="nav" data-page="${id}" title="${esc(sub)}" ${state.page === id ? 'aria-current="page"' : ''}>
+    ${ic(icn)}<span class="nl">${title}</span>${badge ? `<span class="nb ${badge[0]}">${badge[1]}</span>` : ''}</button>`;
+  const open = liveApps().filter(a => acc[a.key] && ['active','degraded'].includes(a.status));
+  return `<aside class="side ${state.menuOpen ? 'open' : ''}">
+    <div class="side-top"><div class="brand"><div class="logo">${ic('hub')}</div><div><b>Bancha</b><small>Control plane</small></div></div>
+      <button class="iconbtn menubtn" data-act="menu" aria-label="Menu" aria-expanded="${state.menuOpen}">${ic(state.menuOpen ? 'x' : 'menu')}</button></div>
+    <div class="side-body">
+      <button class="envbtn" data-act="env"><span>Environment</span><b>Production</b>${ic('chev')}</button>
+      ${admin ? `<div class="grp-l">Control plane</div><nav class="nav" aria-label="Control plane">${items.map(card).join('')}</nav>` : ''}
+      <div class="grp-l">Go to app</div><nav class="nav" aria-label="Go to app">
+        ${card(['myapps','My apps','grid', `${nAcc} app${nAcc === 1 ? '' : 's'} you can open`, null])}
+        ${open.map(a => `<button class="navcard mini" data-act="launch" data-id="${a.key}" title="Open ${esc(a.name)} as ${esc(roleName(a.key, acc[a.key].role))}, already signed in">${tile(a)}<span class="nl">${esc(a.name)}</span><span class="go">${ic('external')}</span></button>`).join('')}</nav>
+      <div class="side-foot"><div class="me"><span class="avatar">${initials(u.name)}</span><div><b>${esc(u.name)}</b><small>${esc(METHOD[state.session.method])}${admin ? ' · admin' : ''}</small></div>
+        <button class="iconbtn" data-act="signout" aria-label="Sign out of all apps" title="Sign out of all apps">${ic('logout')}</button></div></div>
+    </div></aside>`;
+}
+const CRUMB = { myapps:['Go to app','My apps'], overview:['Control plane','Overview'], identity:['Control plane','Users & groups'], connections:['Control plane','Connections'], apps:['Control plane','App registry'], sync:['Control plane','Distribution'] };
+const themeBtn = (cls = 'light') => `<button class="iconbtn ${cls}" data-act="theme" aria-label="Toggle dark mode">${ic(isDark() ? 'sun' : 'moon')}</button>`;
+function topbar(){
+  const u = me(), admin = isAdmin(u), n = admin ? attention().filter(a => a.tone !== 'mute').length : 0;
+  return `<header class="topbar">
+    ${admin ? `<label class="tsearch" for="gsearch">${ic('search')}<input id="gsearch" placeholder="Search users, groups and email" autocomplete="off" aria-label="Search users and groups"></label>` : ''}
+    <span class="grow"></span>
+    ${LIVE.on && state.page === 'connections' ? '<span class="sample live">Live · real connections</span>' : '<span class="sample">Prototype · sample data</span>'}
+    ${admin ? `<button class="iconbtn" data-act="nav" data-page="overview" aria-label="${n} items need attention" title="Needs attention">${ic('bell')}${n ? `<i>${n}</i>` : ''}</button>` : ''}
+    ${themeBtn('')}
+    <div class="tme"><span class="avatar">${initials(u.name)}</span><div><b>${esc(u.name)}</b><small>${admin ? 'Platform admin' : 'Member'}</small></div></div>
+  </header>`;
+}
+
+/* ───────────── Sign-in, app launcher, SSO hand-off ───────────── */
+const MS_LOGO = '<svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true"><rect width="10" height="10" fill="#f25022"/><rect x="11" width="10" height="10" fill="#7fba00"/><rect y="11" width="10" height="10" fill="#00a4ef"/><rect x="11" y="11" width="10" height="10" fill="#ffb900"/></svg>';
+function loginHTML(){
+  const L = state.login, target = L.target && app(L.target);
+  const sub = target ? `Continue to ${esc(target.name)}. You go straight in, already signed in.` : 'Users, connections and apps for Arak, Prajak and OpenMetadata.';
+  const choose = `<button class="btn-sso" data-act="sso"><span class="ms">${MS_LOGO}</span>Sign in with MFEC</button>
+      <button class="btn-alt" data-act="lgmode" data-id="form">${ic('user')}Sign in with username</button>`;
+  const form = `<button class="back" data-act="lgmode" data-id="choose">${ic('arrow')}Other ways to sign in</button>
+      <form id="loginform" class="stack" novalidate>
+        <label class="field"><span>Username</span><input class="inp" id="lg-user" data-lg="user" value="${esc(L.user)}" autocomplete="username" placeholder="siriporn.k"></label>
+        <label class="field"><span>Password</span><input class="inp" id="lg-pass" type="password" autocomplete="current-password"><small>LDAP and local accounts. MFEC (Azure AD) accounts use “Sign in with MFEC”.</small></label>
+        ${L.err ? `<div class="err" role="alert">${esc(L.err)}</div>` : ''}
+        <button class="btn primary block" type="submit">Sign in</button>
+      </form>`;
+  const feat = (icon, t, d) => `<div class="feat"><span class="fi">${ic(icon)}</span><div><b>${t}</b><span>${d}</span></div></div>`;
+  return `<div class="login">
+    <section class="login-main">
+      <div class="login-tools"><span class="sample">Prototype</span>${themeBtn()}</div>
+      <div class="login-box">
+        <div class="login-logo"><div class="logo">${ic('hub')}</div><div class="wm"><b>BANCHA</b><small>Data Platform Control Plane</small></div></div>
+        <h1>Sign in</h1>
+        <p>${sub}</p>
+        ${L.mode === 'form' ? form : choose}
+        ${L.err && L.mode !== 'form' ? `<div class="err" role="alert" style="margin-top:16px">${esc(L.err)}</div>` : ''}
+        <div class="login-note">Prototype: any password works. Try <span class="mono">siriporn.k</span> (no admin) or <span class="mono">sakan.pu</span> (admin). MFEC sign-in shows a sample account list.</div>
+      </div>
+    </section>
+    <section class="login-side" aria-label="About Bancha">
+      <h2>One sign-in. Every data app.</h2>
+      ${feat('users', 'Users and groups from one place', 'Azure AD and LDAP sync in once. Arak, Prajak and OpenMetadata all get the same people and groups.')}
+      ${feat('plug', 'Connections defined once', 'Data sources, OpenMetadata and directories live here. Each app only gets the credential profile it was granted.')}
+      ${feat('grid', 'Apps plug in by contract', 'Register or unregister an app with one manifest. Changes reach every app through the same feed.')}
+    </section></div>`;
+}
+function pickerModal(){
+  const list = ['sakan.pu','somchai.p','chutima.p','kanokwan.s','intern.mkt','wichai.t'].map(k => USERS.find(u => u.user === k));
+  return `<div class="scrim" data-act="close"></div><div class="modal" role="dialog" aria-modal="true" aria-label="Choose an Azure AD account">
+    <div class="d-h"><span class="tile" style="--c:var(--accent)">${ic('cloud')}</span><div><h2>Sign in with MFEC</h2><p>Azure AD · choose a sample account</p></div><button class="xbtn x" data-act="close" aria-label="Close">${ic('x')}</button></div>
+    <div class="d-b" style="gap:8px">${list.map(u => `<button class="rcard acct" data-act="pickuser" data-id="${u.user}"><span class="avatar">${initials(u.name)}</span><span><b>${esc(u.name)}</b>${esc(u.email)} · ${esc(u.dept)}${isAdmin(u) ? ' · Bancha admin' : ''}${u.status !== 'active' ? ' · disabled' : ''}</span></button>`).join('')}
+    <div class="cell-sub">In production Keycloak forwards you to the Azure AD sign-in page here. Password, MFA and conditional access stay in Azure AD. Bancha never sees the password.</div></div></div>`;
+}
+function signIn(u, method){
+  closeLayer();
+  if (u.status !== 'active') { state.login.err = `${u.name}'s account is disabled. ${u.note || ''}`; render(); return; }
+  const dest = state.login.target && app(state.login.target) ? state.login.target : null;
+  state.session = { user:u.user, method, at:clock().slice(0, 5) }; saveSession();
+  state.login = { mode:'choose', target:null, user:'', err:'' }; state.menuOpen = false;
+  AUDIT.unshift({ time:clock().slice(0, 5), actor:u.user, action:'auth.login', target: dest || 'bancha', detail:METHOD[method] });
+  try { history.replaceState(null, '', location.pathname); } catch {}
+  if (dest && app(dest).status !== 'removed') launch(dest, true);
+  else go(isAdmin(u) ? state.page || 'overview' : 'myapps');
+}
+let hoTimer = null;
+function launch(key, fresh){
+  const u = me(), a = app(key), role = userAccess(u)[key];
+  const open = role && ['active','degraded'].includes(a.status);
+  state.handoff = { app:key, fresh, step: open ? 0 : 5 }; state.page = 'handoff';
+  if (hoTimer) { clearInterval(hoTimer); hoTimer = null; }
+  render(); window.scrollTo({ top:0 });
+  if (!open) return;
+  AUDIT.unshift({ time:clock().slice(0, 5), actor:u.user, action:'auth.sso', target:key, detail:`ID token issued to client ${key}` });
+  hoTimer = setInterval(() => { const h = state.handoff; if (!h) { clearInterval(hoTimer); hoTimer = null; return; }
+    h.step++; if (h.step >= 5) { clearInterval(hoTimer); hoTimer = null; } render(); }, 450);
+}
+function handoffHTML(){
+  const h = state.handoff, u = me(), s = state.session, a = app(h.app), acc = userAccess(u)[h.app];
+  const down = !['active','degraded'].includes(a.status);
+  let body;
+  if (down) body = `<div class="banner warn" style="margin:0">${ic('pause')}<div><b>${esc(a.name)} is ${esc(STATUS[a.status][1].toLowerCase())}.</b> Sign-in to it is turned off until an admin resumes it.</div></div>`;
+  else if (!acc) body = `<div class="banner warn" style="margin:0">${ic('lock')}<div><b>You don't have a role in ${esc(a.name)} yet.</b> Roles come from your groups (${esc(u.groups.join(', ') || 'none')}). Request access and the approvers in Arak will review it.</div></div>`;
+  else {
+    const steps = [
+      [h.fresh ? `Signed in to Bancha with ${METHOD[s.method]}` : `Already signed in to Bancha since ${s.at}`,
+        h.fresh ? (s.method === 'azure' ? 'Password and MFA handled by Azure AD' : s.method === 'ldap' ? 'Password checked against ldaps://10.6.150.10' : 'Password checked by Bancha (break-glass account)') : 'Keycloak SSO session. No password asked again'],
+      [`Authorization request from client "${a.key}"`, `${a.baseUrl.replace('https://', '')} → bancha.internal/realms/bancha/…/auth`],
+      ['Role check passed', `${roleName(a.key, acc.role)} via ${acc.via}`],
+      ['Authorization code sent back to the app', a.baseUrl + (REDIRECT[a.key] || '/callback')],
+      [`${a.name} exchanged the code and verified the ID token`, 'Signature checked against the Bancha JWKS'],
+    ];
+    const claims = { iss:'https://bancha.internal/realms/bancha', aud:a.key, sub:'u_' + u.user.replace(/\W/g, '_'), preferred_username:u.user, email:u.email, name:u.name,
+      groups:u.groups.filter(g => GROUPS.find(x => x.name === g)?.bind[a.key]), bancha_roles:[acc.role],
+      idp: s.method === 'azure' ? 'azure-ad-corp' : s.method === 'ldap' ? 'ldap-branch' : 'local', amr: s.method === 'azure' ? ['fed','mfa'] : ['pwd'], exp:1760397240 };
+    body = `<ul class="checks">${steps.map(([t, d], i) => `<li class="${i > h.step ? 'wait' : ''}"><span class="${i < h.step ? 't-ok' : i === h.step ? '' : 't-mute'}">${ic(i < h.step ? 'check' : 'clock')}</span><div>${esc(t)}<small class="${i === 3 ? 'mono' : ''}">${esc(d)}</small></div></li>`).join('')}</ul>
+      ${h.step >= 5 ? `<div class="banner info" style="margin:0">${ic('external')}<div><b>Done.</b> In production the browser is now on <span class="mono">${esc(a.baseUrl)}</span>, signed in as ${esc(u.name)}. The apps are not wired to Bancha yet, so the prototype stops here.</div></div>` : ''}
+      <div class="sec"><h3>ID token ${esc(a.name)} receives</h3><pre class="code">${jsonHL(claims)}</pre><div class="cell-sub" style="margin-top:8px">Only groups and roles that matter to ${esc(a.name)} are in the token.</div></div>`;
+  }
+  return `<div class="handoff"><div class="ho-card"><div class="d-h">${tile(a)}<div><h2>${down || !acc ? esc(a.name) : 'Opening ' + esc(a.name)}</h2><p>${esc(u.name)} · ${esc(u.email)}</p></div></div>
+    <div class="ho-b">${body}</div>
+    <div class="d-f">${btn('logout','Sign out everywhere','signout','ghost')}<span class="grow"></span>${!acc && !down ? btn('send','Request access','reqaccess','', `data-id="${a.key}"`) : ''}${btn('grid','Go to My apps','myapps','primary')}</div></div></div>`;
+}
+function pMyApps(){
+  const u = me(), s = state.session, acc = userAccess(u);
+  const la = liveApps().filter(a => a.status !== 'pending');
+  const card = a => { const r = acc[a.key];
+    return `<article class="card app ${r ? '' : 'dim'}"><div class="app-h">${tile(a)}<div><h3>${esc(a.name)}</h3><p>${esc(a.purpose)}</p></div>${r ? pill('ok', roleName(a.key, r.role)) : pill('mute','No access')}</div>
+    ${a.status === 'suspended' ? `<div class="banner info">${ic('pause')}<div><b>Suspended by an admin.</b> Sign-in is off for now.</div></div>` : ''}
+    <dl class="dl"><div><dt>Address</dt><dd class="mono">${esc(a.baseUrl.replace('https://', ''))}</dd></div><div><dt>Your role</dt><dd>${r ? esc(roleName(a.key, r.role)) : '—'}</dd></div><div><dt>Granted via</dt><dd>${r ? esc(r.via) : 'No group with a role'}</dd></div></dl>
+    <div class="app-f">${r ? btn('external', `Open ${a.name}`, 'launch', 'primary', `data-id="${a.key}"`) : btn('send', 'Request access', 'reqaccess', '', `data-id="${a.key}"`)}</div></article>`; };
+  return pageHead({ eyebrow:'Go to app', title:'My apps',
+      meta:[['Signed in as', u.name],['Method', METHOD[s.method]],['Since', s.at],['Session','8 h']] })
+    + `<div class="apps">${la.map(card).join('')}
+      ${isAdmin(u) ? `<article class="card app"><div class="app-h"><span class="tile" style="--c:var(--c-bancha)">B</span><div><h3>Bancha console</h3><p>Users, connections, app registry, sync</p></div>${pill('info','bancha.admin')}</div>
+        <dl class="dl"><div><dt>Address</dt><dd class="mono">bancha.internal</dd></div><div><dt>Your role</dt><dd>Admin</dd></div><div><dt>Granted via</dt><dd>${esc(u.groups.includes(ADMIN_GROUP) ? ADMIN_GROUP : 'Break-glass account')}</dd></div></dl>
+        <div class="app-f">${btn('arrow','Open console','nav','primary','data-page="overview"')}</div></article>` : ''}</div>
+    <section class="card" style="margin-top:18px"><div class="card-h"><h2>How sign-in works</h2><p>Bancha is the single OIDC issuer for every app</p></div>
+      <div class="flow"><div><span class="dot-badge">1</span><div><b>Sign in once</b><span>With Azure AD, or a username and password for LDAP and local accounts.</span></div></div>
+        <div><span class="dot-badge">2</span><div><b>Open any app</b><span>The app redirects to Bancha, sees your session and gets a token. No second password.</span></div></div>
+        <div><span class="dot-badge">3</span><div><b>Sign out once</b><span>Signing out here ends your session in every app (back-channel logout).</span></div></div></div></section>`;
+}
+
+/* ───────────── Overview ───────────── */
+function topology(){
+  const la = liveApps();
+  const slots = [...la];
+  const H = Math.max(330, 60 + slots.length * 66 + 66);
+  const ay = i => 50 + i * 66;
+  const dirs = [['Azure AD (Entra ID)','1,240 users · delta 15 min','cloud'],['LDAP · branches','32 users · every 30 min','server'],['Local','12 service & break-glass','user']];
+  const bx = 340, bw = 320, by = 44, bh = 230;
+  let s = `<svg viewBox="0 0 1000 ${Math.max(H + 40, by + bh + 112)}" role="img" aria-label="Directories sync into Bancha, which distributes identity and connections to registered apps">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="var(--line-strong)"/></marker>
+  <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="var(--accent)"/></marker></defs>
+  <text class="h" x="20" y="28">USER DIRECTORIES</text><text class="h" x="${bx}" y="28">BANCHA CONTROL PLANE</text><text class="h" x="790" y="28">REGISTERED APPS</text>`;
+  dirs.forEach(([t, sub], i) => { const y = 50 + i * 74;
+    s += `<rect class="n" x="20" y="${y}" width="200" height="56" rx="10"/><text class="t" x="36" y="${y + 24}">${t}</text><text class="s" x="36" y="${y + 43}">${sub}</text>
+    <path class="e" d="M220 ${y + 28} C 280 ${y + 28}, 280 ${by + 60 + i * 50}, ${bx} ${by + 60 + i * 50}" marker-end="url(#arr)"/>`; });
+  s += `<text class="lbl" x="232" y="${by + 30}">sync</text>`;
+  s += `<rect class="n core" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="14"/>`;
+  const mods = [['Identity','users · groups · roles'],['Connections','profiles · grants · vault'],['App registry','contract v1 · lifecycle'],['Change feed', 'seq ' + fmt(SEQ)]];
+  mods.forEach(([t, sub], i) => { const mx = bx + 16 + (i % 2) * 148, my = by + 18 + Math.floor(i / 2) * 78;
+    s += `<rect class="mod" x="${mx}" y="${my}" width="140" height="64" rx="9"/><text class="t" x="${mx + 12}" y="${my + 27}">${t}</text><text class="s" x="${mx + 12}" y="${my + 46}">${sub}</text>`; });
+  s += `<rect class="mod" x="${bx + 16}" y="${by + 176}" width="288" height="38" rx="9"/><text class="t" x="${bx + 30}" y="${by + 200}">Keycloak · OIDC issuer</text><text class="s" x="${bx + 196}" y="${by + 200}">SSO for all apps</text>`;
+  slots.forEach((a, i) => { const y = ay(i); const cy = by + 30 + i * (bh - 60) / Math.max(1, slots.length - 1);
+    const tone = a.status === 'active' && lag(a) <= 20 ? 'var(--ok)' : a.status === 'suspended' ? 'var(--faint)' : 'var(--warn)';
+    const live = a.status === 'active';
+    s += `<path class="e ${live ? 'live' : 'dash'}" d="M${bx + bw} ${cy} C ${bx + bw + 70} ${cy}, 720 ${y + 26}, 790 ${y + 26}" marker-end="url(#${live ? 'arrA' : 'arr'})"/>
+    <rect class="n" x="790" y="${y}" width="190" height="52" rx="10"/><circle cx="808" cy="${y + 26}" r="5" fill="${tone}"/>
+    <text class="t" x="822" y="${y + 23}">${esc(a.name)}</text><text class="s" x="822" y="${y + 40}">${a.mode === 'adapter' ? 'adapter → REST API' : 'webhook · CloudEvents'}</text>`; });
+  const ry = ay(slots.length);
+  s += `<rect class="n" x="790" y="${ry}" width="190" height="52" rx="10" style="stroke-dasharray:4 4;fill:transparent"/><text class="s" x="808" y="${ry + 31}">+ next app (Likit, …)</text>`;
+  const ds = by + bh + 50;
+  s += `<path class="e" d="M${bx + bw / 2} ${by + bh} L ${bx + bw / 2} ${ds}" marker-end="url(#arr)"/><text class="lbl" x="${bx + bw / 2 + 10}" y="${by + bh + 28}">test · rotate</text>
+  <rect class="n" x="${bx}" y="${ds}" width="${bw}" height="52" rx="10"/><text class="t" x="${bx + 16}" y="${ds + 23}">${CONNS.filter(c => c.cat === 'data_source').length} data sources</text>
+  <text class="s" x="${bx + 16}" y="${ds + 40}">Apps pull credentials by grant · secrets never in events</text>
+  <text class="lbl" x="${bx + bw + 14}" y="${by + bh + 50}">events → · ← credentials</text></svg>`;
+  return s;
+}
+function pOverview(){
+  const la = liveApps(); const att = attention();
+  const failing = CONNS.filter(isFailing).length;
+  const u = me();
+  return `<section class="hero"><div class="hero-in"><div class="hero-k">Data platform control plane</div>
+      <h1>Welcome back, ${esc(u.name.split(' ')[0])}</h1>
+      <p>Users, groups and connections in one place, sent to Arak, Prajak and OpenMetadata through one contract.</p>
+      <div class="hero-meta"><span>Production</span><span>Issuer bancha.internal</span><span>Feed seq ${fmt(SEQ)}</span><span>Contract bancha.io/v1</span></div>
+      <div class="hero-a">${btn('plus','Register app','register','white')}${btn('plug','Add connection','addconn','onhero')}${btn('grid','My apps','nav','onhero','data-page="myapps"')}</div></div>
+      <div class="hero-art">${ic('hub')}</div></section>`
+    + kpis([
+      { icon:'users', label:'Users', value:'1,284', sub:'from 3 directories' },
+      { icon:'grid', label:'Groups', value:'46', sub:`${GROUPS.filter(g => Object.keys(g.bind).length).length} bound to app roles` },
+      { icon:'plug', label:'Connections', value:CONNS.length, sub:`${failing} failing · ${CONNS.reduce((s, c) => s + grantCount(c), 0)} grants`, tone: failing ? '' : '' },
+      { icon:'grid', label:'Apps', value:la.length, sub:`${la.filter(a => a.status === 'active').length} active · ${la.filter(a => a.kind === 'Adapter').length} via adapter` },
+      { icon:'alert', label:'Needs attention', value:att.filter(a => a.tone !== 'mute').length, sub:'see the list below', tone: att.some(a => a.tone === 'bad') ? 'bad' : att.length ? 'warn' : 'ok' },
+    ])
+    + `<section class="card"><div class="card-h"><h2>How identity and connections flow</h2><p>Live edges show apps receiving events now</p></div><div class="topo">${topology()}</div></section>
+    <div class="grid-2">
+      <section class="card"><div class="card-h"><h2>App sync status</h2><p>Lag = feed seq minus the last seq each app applied</p></div>
+        <div class="tbl-wrap"><table><thead><tr><th>App</th><th>Status</th><th>Version</th><th>Applied seq</th><th>Lag</th><th>Users</th><th>Grants</th><th>Heartbeat</th></tr></thead><tbody>
+        ${la.map(a => `<tr data-act="goapps" tabindex="0"><td><div class="src">${tile(a)}<div><div class="cell-title">${esc(a.name)}</div><div class="cell-sub">${esc(a.kind === 'Adapter' ? 'Adapter' : 'Webhook')}</div></div></div></td>
+          <td>${appPill(a)}</td><td class="num">${esc(a.version)}</td><td class="num mono">${fmt(a.applied)}</td>
+          <td class="num ${lag(a) > 20 ? 't-warn' : lag(a) ? '' : 't-ok'}">${lag(a) ? fmt(lag(a)) : 'In sync'}</td>
+          <td class="num">${fmt(a.users)}</td><td class="num">${CONNS.reduce((s, c) => s + (c.grants[a.key] || []).length, 0)}</td><td class="t-mute">${esc(a.hb)}</td></tr>`).join('')}
+        </tbody></table></div></section>
+      <section class="card"><div class="card-h"><h2>Needs attention</h2><p>${att.length} items</p></div>
+        <ul class="attn">${att.map(x => `<li><span class="t-${x.tone}">${ic(x.icon)}</span><div><b>${esc(x.title)}</b><span>${esc(x.sub)}</span></div><button class="btn sm ghost" data-act="${x.act}" data-id="${esc(x.id)}">Open</button></li>`).join('') || '<li><span class="t-ok">' + ic('check') + '</span><div><b>All clear</b></div></li>'}</ul>
+        <div class="card-h" style="padding-top:6px"><h2>Recent changes</h2><p>From the change feed</p></div>
+        <ul class="feed">${FEED.slice(0, 6).map(e => `<li><time>${esc(e.time.slice(0, 5))}</time><div><span class="mono">${esc(e.type)}</span><div class="cell-sub">${esc(e.subject)}</div></div></li>`).join('')}</ul>
+      </section>
+    </div>`;
+}
+
+/* ───────────── Identity ───────────── */
+function pIdentity(){
+  const sub = state.sub.identity;
+  const head = pageHead({ eyebrow:'Identity', title:'Users & groups',
+    meta:[['Directories','3'],['Users','1,284'],['Groups','46'],['Last sync','13 Oct 2026 · 22:10']],
+    actions: btn('refresh','Sync directories','syncdirs') + btn('plus','Add local user','adduser','primary'),
+    seg: seg('identity', [['users','Users','user'],['groups','Groups','users'],['bindings','Role bindings','shield']]) });
+  const k = kpis([
+    { icon:'cloud', label:'Azure AD', value:'1,240', sub:'38 groups · delta every 15 min' },
+    { icon:'server', label:'LDAP', value:'32', sub:'1 group · every 30 min' },
+    { icon:'user', label:'Local', value:'12', sub:'service & break-glass accounts' },
+    { icon:'pause', label:'Disabled', value:'7', sub:'purged 30 days after removal' },
+    { icon:'alert', label:'No app access', value:'19', sub:'active but in no bound group', tone:'warn' },
+  ]);
+  if (sub === 'users') return head + k + usersTable();
+  if (sub === 'groups') return head + k + groupsTable();
+  return head + k + bindingsMatrix();
+}
+function usersTable(){
+  const la = liveApps();
+  const rows = USERS.filter(u => match(state.q.users, u.name, u.email, u.dept, u.groups.join(' '))
+    && (state.f.uSrc === 'all' || u.src === state.f.uSrc)
+    && (state.f.uStatus === 'all' || u.status === state.f.uStatus)
+    && (state.f.uApp === 'all' || (state.f.uApp === 'none' ? !Object.keys(userAccess(u)).length : userAccess(u)[state.f.uApp])));
+  return `<section class="card"><div class="filters">${search('q-users','users','Search name, email, department, group')}
+    ${fsel('f-usrc','Source','uSrc',[['all','All'],['Azure AD','Azure AD'],['LDAP','LDAP'],['Local','Local']])}
+    ${fsel('f-uapp','App access','uApp',[['all','All'], ...la.map(a => [a.key, a.name]), ['none','No access']])}
+    ${fsel('f-ustatus','Status','uStatus',[['all','All'],['active','Active'],['disabled','Disabled']])}
+    <span class="spacer"></span><span class="count">${rows.length} users</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>User</th><th>Source</th><th>Groups</th><th>App access</th><th>Status</th><th>Last sync</th></tr></thead><tbody>
+    ${rows.map(u => { const acc = userAccess(u); return `<tr data-act="user" data-id="${esc(u.user)}" tabindex="0">
+      <td><div class="cell-title">${esc(u.name)}</div><div class="cell-sub">${esc(u.email)}</div></td>
+      <td>${src(u.src)}<div class="cell-sub">${esc(u.dept)}</div></td>
+      <td><div class="chips">${u.groups.slice(0, 2).map(g => `<span class="chip">${esc(g)}</span>`).join('')}${u.groups.length > 2 ? `<span class="chip more">+${u.groups.length - 2}</span>` : ''}${u.groups.length ? '' : '<span class="t-mute">—</span>'}</div></td>
+      <td><div class="chips">${Object.entries(acc).map(([k, v]) => appChip(k, `${app(k).name} · ${roleName(k, v.role)}`)).join('') || '<span class="t-mute">No access</span>'}</div></td>
+      <td>${u.status === 'active' ? pill('ok','Active') : pill('mute','Disabled')}</td>
+      <td class="num t-mute">${esc(u.sync)}</td></tr>`; }).join('') || `<tr><td colspan="6" class="empty">No users match these filters.</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>Showing ${rows.length} of 1,284 · sample rows</span><span>App access comes from group role bindings</span></div></section>`;
+}
+function groupsTable(){
+  const rows = GROUPS.filter(g => match(state.q.groups, g.name, g.desc, g.src));
+  return `<section class="card"><div class="filters">${search('q-groups','groups','Search group')}<span class="spacer"></span><span class="count">${rows.length} groups</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Group</th><th>Source</th><th>Members</th><th>App roles</th><th>Last change</th></tr></thead><tbody>
+    ${rows.map(g => `<tr><td><div class="cell-title">${esc(g.name)}</div><div class="cell-sub">${esc(g.desc)}</div></td><td>${src(g.src)}</td><td class="num">${fmt(g.members)}</td>
+      <td><div class="chips">${Object.entries(g.bind).filter(([k]) => app(k) && app(k).status !== 'removed').map(([k, r]) => appChip(k, `${app(k).name} · ${roleName(k, r)}`)).join('') || '<span class="t-mute">None</span>'}</div></td>
+      <td class="t-mute">${esc(g.changed)}</td></tr>`).join('')}
+    </tbody></table></div><div class="tbl-foot"><span>Showing ${rows.length} of 46 · sample rows</span><span>Groups from Azure AD and LDAP are read-only here</span></div></section>`;
+}
+function bindingsMatrix(){
+  const la = liveApps().filter(a => a.status !== 'pending');
+  return `<section class="card mx"><div class="card-h"><h2>Group → app role</h2><p>Each app defines its roles in its manifest. Bancha decides who holds them.</p></div>
+    <div class="note">${ic('zap')}<span>Changing a cell writes a role binding and sends <span class="mono">rolebinding.granted</span> or <span class="mono">rolebinding.revoked</span> to that app only.</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Group</th><th>Members</th>${la.map(a => `<th><span class="src">${tile(a).replace('tile"', 'tile" style="width:24px;height:24px;font-size:12px;border-radius:6px;--c:var(--c-' + a.key + ')"')}${esc(a.name)}</span></th>`).join('')}</tr></thead><tbody>
+    ${GROUPS.map((g, gi) => `<tr><td><div class="cell-title">${esc(g.name)}</div><div class="cell-sub">${esc(g.src)}</div></td><td class="num">${fmt(g.members)}</td>
+      ${la.map(a => `<td class="r"><select id="mx-${gi}-${a.key}" data-bind="${gi}|${a.key}" class="${g.bind[a.key] ? '' : 'none'}" aria-label="${esc(a.name)} role for ${esc(g.name)}">
+        <option value="">— No role</option>${a.roles.map(([rk, rn]) => `<option value="${rk}" ${g.bind[a.key] === rk ? 'selected' : ''}>${esc(rn)}</option>`).join('')}</select>${ic('chev','cv')}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div></section>`;
+}
+
+/* ───────────── Connections ───────────── */
+function pConnections(){
+  const sub = state.sub.connections;
+  const ds = CONNS.filter(c => c.cat === 'data_source');
+  const head = pageHead({ eyebrow:'Connections', title:'Connections',
+    meta: LIVE.on ? [['Data','Live from real systems'],['Secrets','.env on the Bancha host'],['Last test run', 'Today · ' + LIVE.at]] : [['Secret store','Vault · kv/bancha'],['Rotation policy','90 days'],['Last test run','13 Oct 2026 · 22:05']],
+    actions: btn('zap','Test all','testall') + btn('plus','Add connection','addconn','primary'),
+    seg: seg('connections', [['data_source','Data sources','db'],['metadata','OpenMetadata','book'],['directory','User directories','users']]) });
+  const k = kpis([
+    { icon:'db', label:'Data sources', value:ds.length, sub:`${new Set(ds.map(c => c.type)).size} engine types` },
+    { icon:'check', label:'Healthy', value:CONNS.filter(c => connStatus(c)[0] === 'ok').length, sub:'passed the last test' },
+    { icon:'alert', label:'Failing', value:CONNS.filter(isFailing).length, sub:'could not connect', tone: CONNS.some(isFailing) ? 'bad' : '' },
+    { icon:'key', label:'Secrets overdue', value:CONNS.filter(c => secretAge(c) > 90).length, sub:'older than 90 days', tone: CONNS.some(c => secretAge(c) > 90) ? 'warn' : '' },
+    { icon:'shield', label:'Grants', value:CONNS.reduce((s, c) => s + grantCount(c), 0), sub:`across ${liveApps().length} apps · per profile` },
+  ]);
+  const need = CONNS.filter(c => c.missing && c.missing.length);
+  const live = LIVE.on ? `<div class="banner ${need.length ? 'warn' : 'info'}">${ic(need.length ? 'key' : 'check')}<div><b>Live.</b> These are the real connections, checked read-only from Bancha.
+    ${need.length ? `Still needed: ${need.map(c => `<b>${esc(c.id)}</b> (${c.missing.map(m => esc(m.what)).join(', ')})`).join(' · ')}.` : 'Every connection has its credentials.'}</div></div>` : '';
+  if (sub === 'directory') return head + live + k + dirTable();
+  return head + live + k + connTable(sub);
+}
+function connTable(cat){
+  const all = CONNS.filter(c => c.cat === cat);
+  const rows = all.filter(c => match(state.q.conns, c.id, c.host, c.db, c.type)
+    && (state.f.cType === 'all' || c.type === state.f.cType)
+    && (state.f.cStatus === 'all' || connStatus(c)[1] === state.f.cStatus));
+  return `<section class="card"><div class="filters">${search('q-conns','conns','Search name, host, database')}
+    ${cat === 'data_source' ? fsel('f-ctype','Type','cType',[['all','All'], ...[...new Set(all.map(c => c.type))].map(t => [t, t])]) : ''}
+    ${fsel('f-cstatus','Status','cStatus',[['all','All'],['Healthy','Healthy'],['Failing','Failing'],['Rotate secret','Rotate secret']])}
+    <span class="spacer"></span><span class="count">${rows.length} connections</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Connection</th><th>Type</th><th>Granted to</th><th>Secret age</th><th>Last test</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(c => { const [t, l] = connStatus(c); const age = secretAge(c); return `<tr data-act="conn" data-id="${esc(c.id)}" tabindex="0">
+      <td><div class="cell-title">${esc(c.id)}</div><div class="cell-sub mono">${esc(c.host)}${c.port ? ':' + c.port : ''}${c.db !== '—' ? ' / ' + esc(c.db) : ''}</div></td>
+      <td><span class="tag">${esc(c.type)}</span></td>
+      <td><div class="chips">${Object.entries(c.grants).filter(([k, v]) => v.length && app(k)).map(([k, v]) => appChip(k, `${app(k).name} · ${v.join(', ')}`)).join('') || '<span class="t-mute">Not granted</span>'}</div></td>
+      <td class="num ${age > 90 ? 't-warn' : ''}">${c.live ? '<span class="t-mute">—</span>' : age + ' days'}</td>
+      <td>${c.test.ok ? `<span class="t-ok">${ic('check')}</span> <span class="num">${c.test.ms} ms</span><div class="cell-sub">${c.test.at}</div>` : c.missing && c.missing.length ? `<span class="t-warn">Not set up</span><div class="cell-sub">Needs ${esc(c.missing.map(m => m.what.replace(/^\w+ profile /, '')).join(', '))}</div>` : `<span class="t-bad">Failed · ${c.test.at}</span><div class="cell-sub">${esc(c.test.err)}</div>`}</td>
+      <td>${pill(t, l)}</td></tr>`; }).join('') || `<tr><td colspan="6" class="empty">No connections match these filters.</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>${cat === 'metadata' ? 'Each app gets its own OpenMetadata bot token' : 'Apps receive host and database in events, then pull credentials for their granted profile'}</span><span>${LIVE.on ? 'Live · checked read-only' : 'Sample rows'}</span></div></section>`;
+}
+function dirTable(){
+  const rows = CONNS.filter(c => c.cat === 'directory');
+  return `<section class="card"><div class="card-h"><h2>User directories</h2><p>Only Bancha's identity service uses these connections</p></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Directory</th><th>Endpoint</th><th>Sync</th><th>Last sync</th><th>Imported</th><th>Status</th><th></th></tr></thead><tbody>
+    ${rows.map(c => `<tr data-act="conn" data-id="${esc(c.id)}" tabindex="0"><td><span class="src">${ic(srcIcon(c.type))}<span><span class="cell-title">${esc(c.id)}</span><div class="cell-sub">${esc(c.type)}</div></span></span></td>
+      <td><div class="mono">${esc(c.host)}</div><div class="cell-sub">${esc(c.db)}</div></td>
+      <td>${esc(c.dir.every)}<div class="cell-sub mono">${esc(c.live && c.missing.length ? 'Needs ' + c.missing.map(m => m.what).join(', ') : c.dir.filter)}</div></td>
+      <td class="num">${esc(c.dir.last)}</td><td class="num">${fmt(c.dir.users)} users · ${c.dir.groups} groups</td><td>${pill(...connStatus(c))}</td>
+      <td><button class="btn sm" data-act="syncdir" data-id="${esc(c.id)}">${ic('refresh')}Sync now</button></td></tr>`).join('')}
+    <tr><td><span class="src">${ic('user')}<span><span class="cell-title">local</span><div class="cell-sub">Bancha</div></span></span></td><td class="t-mute">—</td><td class="t-mute">Managed in Bancha</td><td class="t-mute">—</td><td class="num">12 users · 1 group</td><td>${pill('ok','Healthy')}</td><td></td></tr>
+    </tbody></table></div></section>`;
+}
+
+/* ───────────── Apps ───────────── */
+function pApps(){
+  const sub = state.sub.apps; const la = liveApps();
+  const head = pageHead({ eyebrow:'Apps', title:'App registry',
+    meta:[['Contract','bancha.io/v1'],['Registered', String(la.length)],['Removed', String(REMOVED.length)],['Registration tokens','1 active · expires 23:40']],
+    actions: btn('key','Create registration token','regtoken') + btn('plus','Register app','register','primary'),
+    seg: seg('apps', [['registry','Registry','grid'],['contract','Contract v1','file']]) });
+  if (sub === 'contract') return head + contractView();
+  const k = kpis([
+    { icon:'grid', label:'Registered', value:la.length, sub:`${la.filter(a => a.kind === 'App').length} native · ${la.filter(a => a.kind === 'Adapter').length} adapter` },
+    { icon:'check', label:'Active', value:la.filter(a => a.status === 'active').length, sub:'receiving events', tone:'ok' },
+    { icon:'clock', label:'In transition', value:la.filter(a => !['active'].includes(a.status)).length, sub:'pending, suspended or leaving' },
+    { icon:'activity', label:'Max lag', value:fmt(Math.max(0, ...la.filter(a => a.status === 'active').map(lag))), sub:'events behind the feed', tone: la.some(a => a.status === 'active' && lag(a) > 20) ? 'warn' : '' },
+    { icon:'shield', label:'Role definitions', value:la.reduce((s, a) => s + a.roles.length, 0), sub:'declared in manifests' },
+  ]);
+  return head + k + `<div class="apps">${la.map(appCard).join('')}
+    <button class="slot" data-act="register">${ic('plus')}<span><b>Register an app</b>Point Bancha at a manifest URL or hand the app a one-time registration token.</span></button></div>`;
+}
+function appCard(a){
+  const grants = CONNS.filter(c => (c.grants[a.key] || []).length);
+  const deps = liveApps().filter(x => x.deps.includes(a.key));
+  let banner = '';
+  if (a.status === 'deregistering') banner = `<div class="banner warn">${ic('logout')}<div><b>Deregistering.</b> SSO is off and only <span class="mono">app.deregistering</span> was sent. Waiting for the app to confirm purge · ${esc(a.grace)}.</div></div>`;
+  else if (a.status === 'suspended') banner = `<div class="banner info">${ic('pause')}<div><b>Suspended.</b> Events are held in the feed and credentials are refused. Resume to catch up from seq ${fmt(a.applied)}.</div></div>`;
+  else if (lag(a) > 20) banner = `<div class="banner warn">${ic('clock')}<div><b>${lag(a)} events behind.</b> The webhook returns 503 since 22:10. Bancha retries with backoff; the app can also catch up from the feed.</div></div>`;
+  const actions = a.status === 'deregistering'
+    ? `<span class="grow"></span>${btn('check','Simulate purge confirmed','purged','sm','data-id="' + a.key + '"')}${btn('trash','Force remove','forceremove','sm danger','data-id="' + a.key + '"')}`
+    : `${btn('file','Manifest','manifest','sm','data-id="' + a.key + '"')}${btn('refresh','Resync','resync','sm','data-id="' + a.key + '"')}<span class="grow"></span>
+       ${a.status === 'suspended' ? btn('play','Resume','resume','sm','data-id="' + a.key + '"') : btn('pause','Suspend','suspend','sm','data-id="' + a.key + '"')}
+       ${btn('logout','Unregister','unregister','sm danger','data-id="' + a.key + '"')}`;
+  return `<article class="card app"><div class="app-h">${tile(a)}<div><h3>${esc(a.name)}</h3><p>${esc(a.purpose)}</p></div>${appPill(a)}</div>${banner}
+    <dl class="dl">
+      <div><dt>Version</dt><dd class="num">${esc(a.version)}</dd></div>
+      <div><dt>Delivery</dt><dd>${a.mode === 'adapter' ? 'Adapter (REST)' : 'Webhook'}</dd></div>
+      <div><dt>Applied seq</dt><dd class="num">${fmt(a.applied)} ${lag(a) ? `<span class="t-warn">−${lag(a)}</span>` : '<span class="t-ok">✓</span>'}</dd></div>
+      <div><dt>Base URL</dt><dd class="mono">${esc(a.baseUrl.replace('https://', ''))}</dd></div>
+      <div><dt>Heartbeat</dt><dd>${esc(a.hb)}</dd></div>
+      <div><dt>Users synced</dt><dd class="num">${fmt(a.users)}</dd></div>
+      <div><dt>Roles</dt><dd>${a.roles.map(r => esc(r[1])).join(', ')}</dd></div>
+      <div><dt>Connections</dt><dd>${grants.length ? grants.map(c => esc(c.id)).slice(0, 3).join(', ') + (grants.length > 3 ? ` +${grants.length - 3}` : '') : '—'}</dd></div>
+      <div><dt>${deps.length ? 'Needed by' : 'Depends on'}</dt><dd>${deps.length ? deps.map(d => esc(d.name)).join(', ') : a.deps.length ? a.deps.map(d => esc(app(d)?.name || d)).join(', ') : '—'}</dd></div>
+    </dl>
+    <div class="app-ev"><div class="lab">Subscribes to</div><div class="chips">${a.subs.map(s => `<span class="chip mono">${esc(s)}</span>`).join('')}</div></div>
+    <div class="app-f">${actions}</div></article>`;
+}
+function contractView(){
+  const stateList = ['Pending','Provisioning','Active','Degraded','Suspended','Deregistering','Removed'];
+  return `<div class="contract">
+    <section class="card"><h3>The app exposes</h3><p>Three endpoints. The bancha-sdk implements them for Python, Java and Node.</p>
+      <ul class="ep">
+        <li><span class="m">GET</span><code>/.well-known/bancha-app.json</code><span class="d">Manifest: roles, required attributes, connection profiles, events</span></li>
+        <li><span class="m">GET</span><code>/bancha/health</code><span class="d">Returns status, version and appliedSeq</span></li>
+        <li><span class="m">POST</span><code>/bancha/events</code><span class="d">CloudEvents, HMAC signed. Idempotent by id and version</span></li>
+      </ul></section>
+    <section class="card"><h3>Bancha gives the app</h3><p>Issued when an admin approves the requested scopes.</p>
+      <ul class="ep">
+        <li><span class="m">OAUTH</span><code>client_id / client_secret</code><span class="d">Client credentials for the App API, scoped to approved grants</span></li>
+        <li><span class="m">HMAC</span><code>webhook_secret</code><span class="d">Verifies Bancha-Signature on every event</span></li>
+        <li><span class="m">OIDC</span><code>SSO client</code><span class="d">Same client_id, redirect URIs from the manifest</span></li>
+      </ul></section>
+    <section class="card"><h3>The app calls</h3><p>When it starts, misses events or needs a secret.</p>
+      <ul class="ep">
+        <li><span class="m">GET</span><code>/api/v1/app/feed?after={seq}</code><span class="d">Catch up on missed events</span></li>
+        <li><span class="m">GET</span><code>/api/v1/app/snapshot/{resource}</code><span class="d">Full resync of users, groups, bindings, connections</span></li>
+        <li><span class="m">GET</span><code>/api/v1/app/connections/{id}/credentials</code><span class="d">Short-lived secret for a granted profile. Kept in memory only</span></li>
+        <li><span class="m">POST</span><code>/api/v1/app/heartbeat</code><span class="d">Every 30 s with appliedSeq. Drives lag and health</span></li>
+      </ul></section>
+  </div>
+  <section class="card" style="margin-bottom:18px"><div class="card-h"><h2>Lifecycle</h2><p>Unregistering always passes through Deregistering so the app can purge cached data</p></div>
+    <div class="filters states">${stateList.map((s, i) => `${i ? ic('arrow') : ''}${pill(s === 'Active' ? 'ok' : s === 'Removed' ? 'mute' : ['Degraded','Deregistering'].includes(s) ? 'warn' : 'info', s)}`).join('')}</div></section>
+  <div class="contract">
+    <section class="card"><h3>Example manifest · Arak</h3><p>contracts/examples/arak.bancha-app.yaml</p><pre class="code">${yamlFor(app('arak') || APPS[0])}</pre></section>
+    <section class="card"><h3>Example event</h3><p>Bancha-Signature: t=1760368222,v1=5b0c3e…</p><pre class="code">${jsonHL(eventFor({ seq:48213, type:'user.updated', subject:'users/somchai.p' }, 'arak'))}</pre></section>
+  </div>`;
+}
+function yamlFor(a){
+  const k = s => `<span class="k">${s}</span>`;
+  return `${k('apiVersion')}: bancha.io/v1
+${k('kind')}: ${a.kind}
+${k('metadata')}:
+  ${k('key')}: ${a.key}
+  ${k('name')}: ${esc(a.name)}
+  ${k('owner')}: ${esc(a.owner)}
+${k('spec')}:
+  ${k('version')}: ${a.version}
+  ${k('baseUrl')}: ${a.baseUrl}
+  ${k('roles')}:
+${a.roles.map(([rk, rn]) => `    - ${k('key')}: ${rk}\n      ${k('name')}: ${esc(rn)}`).join('\n')}
+  ${k('requires')}:
+    ${k('identity')}:
+      ${k('users')}: { ${k('attributes')}: [${a.attrs.join(', ')}] }
+      ${k('groups')}: true
+    ${k('connections')}:
+${a.key === 'arak' ? `      - { ${k('types')}: [postgresql, oracle, snowflake], ${k('profiles')}: [admin] }\n      - { ${k('types')}: [openmetadata], ${k('profiles')}: [read] }` : a.key === 'openmetadata' ? `      - { ${k('types')}: [postgresql, oracle, mssql, snowflake, databricks], ${k('profiles')}: [metadata] }` : `      - { ${k('types')}: [postgresql, oracle, mssql, snowflake, databricks, trino], ${k('profiles')}: [read] }\n      - { ${k('types')}: [openmetadata], ${k('profiles')}: [write] }`}
+  ${k('events')}:
+    ${k('subscribe')}: [${a.subs.join(', ')}]${a.pub.length ? `\n    ${k('publish')}: [${a.pub.join(', ')}]` : ''}
+  ${k('delivery')}: { ${k('mode')}: ${a.mode}${a.mode === 'adapter' ? ', ' + k('adapter') + ': openmetadata' : ''} }${a.deps.length ? `\n  ${k('dependsOn')}: [${a.deps.join(', ')}]` : ''}`;
+}
+function eventFor(e, appKey){
+  const a = app(appKey);
+  const isUser = e.subject.startsWith('users/');
+  const u = isUser && USERS.find(x => 'users/' + x.user === e.subject);
+  let data;
+  if (u) { data = { id:'u_' + u.user.replace('.', '_'), version:u.ver };
+    (a ? a.attrs : ['username','email','displayName']).forEach(f => data[f] = f === 'username' ? u.user : f === 'email' ? u.email : f === 'displayName' ? u.name : f === 'department' ? u.dept : f === 'manager' ? 'u_sakan_pu' : null);
+    data.status = u.status; data.groups = u.groups; data.roles = a ? [userAccess(u)[a.key]?.role].filter(Boolean) : []; }
+  else if (e.subject.startsWith('connections/')) { const c = CONNS.find(x => 'connections/' + x.id === e.subject);
+    data = c ? { id:c.id, version:7, type:c.type.toLowerCase().replace(' ', ''), host:c.host, port:c.port, database:c.db, profiles:(c.grants[appKey] || []), credentialsUrl:`/api/v1/app/connections/${c.id}/credentials` } : {}; }
+  else data = { subject:e.subject, version:1 };
+  return { specversion:'1.0', id:'evt_01JA3K' + String(e.seq).slice(-4) + 'Q2X', source:'bancha://prod', type:'io.bancha.' + e.type, subject:e.subject, time:'2026-10-13T15:10:22Z', datacontenttype:'application/json', banchaseq:e.seq, data };
+}
+const jsonHL = o => esc(JSON.stringify(o, null, 2)).replace(/(&quot;[^&]*?&quot;)(:)/g, '<span class="k">$1</span>$2').replace(/: (&quot;.*?&quot;)/g, ': <span class="s">$1</span>');
+
+/* ───────────── Sync & audit ───────────── */
+function pSync(){
+  const sub = state.sub.sync;
+  const head = pageHead({ eyebrow:'Sync & audit', title:'Delivery and audit',
+    meta:[['Feed seq', fmt(SEQ)],['Retention','30 days'],['Retry policy','8 attempts · 30 s → 12 h'],['Delivery','at-least-once']],
+    actions: btn('refresh','Retry failed','retryall') ,
+    seg: seg('sync', [['deliveries','Deliveries','activity'],['feed','Change feed','zap'],['audit','Audit log','shield']]) });
+  const dead = DLV.filter(d => d.status === 'dead').length, retrying = DLV.filter(d => d.status === 'retrying').length;
+  const k = kpis([
+    { icon:'zap', label:'Events · 24 h', value:'3,412', sub:'written to the change feed' },
+    { icon:'check', label:'Delivered', value:'99.6%', sub:'first attempt 97.1%', tone:'ok' },
+    { icon:'refresh', label:'Retrying', value:retrying, sub:'backing off', tone: retrying ? 'warn' : '' },
+    { icon:'alert', label:'Dead letter', value:dead, sub:'needs a manual retry or resync', tone: dead ? 'bad' : '' },
+    { icon:'clock', label:'P95 latency', value:'410 ms', sub:'Bancha → app acknowledgement' },
+  ]);
+  if (sub === 'feed') return head + k + feedTable();
+  if (sub === 'audit') return head + k + auditTable();
+  const la = APPS.concat(REMOVED);
+  const rows = DLV.filter(d => match(state.q.dlv, d.type, d.subject, String(d.seq)) && (state.f.dApp === 'all' || d.app === state.f.dApp) && (state.f.dStatus === 'all' || d.status === state.f.dStatus));
+  const tone = { delivered:'ok', retrying:'warn', dead:'bad', pending:'info' };
+  return head + k + `<section class="card"><div class="filters">${search('q-dlv','dlv','Search event, subject, seq')}
+    ${fsel('f-dapp','App','dApp',[['all','All'], ...la.map(a => [a.key, a.name])])}
+    ${fsel('f-dstatus','Status','dStatus',[['all','All'],['delivered','Delivered'],['retrying','Retrying'],['dead','Dead letter'],['pending','Pending']])}
+    <span class="spacer"></span><span class="count">${rows.length} deliveries</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Seq</th><th>Event</th><th>App</th><th>Status</th><th>Attempts</th><th>Latency</th><th>Time</th><th></th></tr></thead><tbody>
+    ${rows.map(d => `<tr data-act="dlv" data-id="${esc(d.id)}" tabindex="0"><td class="num mono">${fmt(d.seq)}</td>
+      <td><div class="mono">${esc(d.type)}</div><div class="cell-sub">${esc(d.subject)}</div></td>
+      <td>${appChip(d.app, app(d.app)?.name || d.app)}</td>
+      <td>${pill(tone[d.status], d.status === 'dead' ? 'Dead letter' : d.status[0].toUpperCase() + d.status.slice(1))}${d.err ? `<div class="cell-sub">${esc(d.err)}</div>` : ''}</td>
+      <td class="num">${d.attempts}/8</td><td class="num">${d.ms ? d.ms + ' ms' : '—'}</td><td class="num t-mute">${esc(d.time)}</td>
+      <td>${['dead','retrying'].includes(d.status) ? `<button class="btn sm" data-act="retry" data-id="${esc(d.id)}">${ic('refresh')}Retry</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="8" class="empty">No deliveries match these filters.</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>Apps dedupe by event id and ignore older versions, so retries are safe</span><span>Sample rows</span></div></section>`;
+}
+function feedTable(){
+  return `<section class="card"><div class="card-h"><h2>Change feed</h2><p>Outbox written in the same transaction as the change. Apps read it with GET /api/v1/app/feed?after=seq</p></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Seq</th><th>Type</th><th>Subject</th><th>Version</th><th>Caused by</th><th>Audience</th><th>Time</th></tr></thead><tbody>
+    ${FEED.map(e => `<tr><td class="num mono">${fmt(e.seq)}</td><td class="mono">${esc(e.type)}</td><td>${esc(e.subject)}</td><td class="num">v${e.v}</td><td>${esc(e.actor)}</td><td class="num">${e.n} app${e.n > 1 ? 's' : ''}</td><td class="num t-mute">${esc(e.time)}</td></tr>`).join('')}
+    </tbody></table></div></section>`;
+}
+function auditTable(){
+  const rows = AUDIT.filter(a => match(state.q.audit, a.actor, a.action, a.target, a.detail));
+  return `<section class="card"><div class="filters">${search('q-audit','audit','Search actor, action, target')}<span class="spacer"></span><span class="count">${rows.length} entries</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead><tbody>
+    ${rows.map(a => `<tr><td class="num t-mute">${esc(a.time)}</td><td>${a.actor === 'system' ? '<span class="t-mute">system</span>' : esc(a.actor)}</td><td class="mono">${esc(a.action)}</td><td>${esc(a.target)}</td><td>${esc(a.detail)}</td></tr>`).join('')}
+    </tbody></table></div><div class="tbl-foot"><span>Append-only. Secrets are masked in before/after snapshots.</span><span>Today, 13 Oct 2026</span></div></section>`;
+}
+
+/* ───────────── Drawers ───────────── */
+function drawer(title, sub, body, foot = '', lead = '', extra = ''){
+  return `<div class="scrim" data-act="close"></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="d-h">${lead}<div><h2>${esc(title)}</h2>${sub ? `<p>${sub}</p>` : ''}</div><button class="xbtn x" data-act="close" aria-label="Close">${ic('x')}</button></div>${extra}
+    <div class="d-b">${body}</div>${foot ? `<div class="d-f">${foot}</div>` : ''}</aside>`;
+}
+function userDrawer(id){
+  const u = USERS.find(x => x.user === id); if (!u) return '';
+  const acc = userAccess(u);
+  const la = liveApps().filter(a => a.status !== 'pending');
+  return drawer(u.name, esc(u.email), `
+    <div class="sec"><h3>Profile</h3><div class="box"><dl class="kv">
+      <dt>Username</dt><dd class="mono">${esc(u.user)}</dd><dt>Department</dt><dd>${esc(u.dept)}</dd>
+      <dt>Source</dt><dd>${src(u.src)}</dd><dt>External id</dt><dd class="mono">${esc(u.oid)}</dd>
+      <dt>Status</dt><dd>${u.status === 'active' ? pill('ok','Active') : pill('mute','Disabled')}${u.note ? `<div class="cell-sub">${esc(u.note)}</div>` : ''}</dd><dt>Version</dt><dd class="num">v${u.ver}</dd></dl></div></div>
+    <div class="sec"><h3>Groups</h3><div class="chips">${u.groups.map(g => `<span class="chip">${esc(g)}</span>`).join('') || '<span class="t-mute">Not in any group</span>'}</div></div>
+    <div class="sec"><h3>Access and sync per app</h3><div class="box"><table><thead><tr><th>App</th><th>Role</th><th>Via</th><th>Applied</th></tr></thead><tbody>
+      ${la.map(a => { const r = acc[a.key]; const synced = a.applied >= u.seq;
+        return `<tr><td>${appChip(a.key, a.name)}</td><td>${r ? esc(roleName(a.key, r.role)) : '<span class="t-mute">—</span>'}</td><td class="t-mute">${r ? esc(r.via) : ''}</td>
+        <td>${synced ? `<span class="t-ok">v${u.ver} ✓</span>` : `<span class="t-warn">v${u.ver - 1} · v${u.ver} pending</span>`}</td></tr>`; }).join('')}
+    </tbody></table></div></div>
+    <div class="sec"><h3>Attributes sent</h3><div class="box">${la.map(a => `<div style="padding:4px 0"><b>${esc(a.name)}</b> <span class="t-mute mono">${a.attrs.join(', ')}</span></div>`).join('')}
+      <div class="cell-sub" style="margin-top:6px">Each app receives only the attributes its manifest asked for and an admin approved.</div></div></div>`,
+    `${u.src === 'Local' ? btn('pause','Disable user','toast','danger','data-msg="Local user disabled · user.disabled queued"') : '<span class="grow t-mute" style="align-self:center;font-size:14px">Managed in ' + esc(u.src) + '. Edit the user there.</span>'}${btn('refresh','Resend to apps','resenduser','', 'data-id="' + u.user + '"')}`);
+}
+function liveSection(c){
+  const i = c.info;
+  const miss = c.missing.length ? `<div class="banner warn" style="margin:0 0 12px">${ic('key')}<div><b>Needs credentials.</b> Put these in <span class="mono">.env</span> on the Bancha host, then test again:
+    <ul style="margin:6px 0 0;padding-left:18px">${c.missing.map(m => `<li>${esc(m.what)} → <span class="mono">${esc(m.env)}</span></li>`).join('')}</ul></div></div>` : '';
+  if (!i) return `<div class="sec"><h3>Found on the real system</h3>${miss || '<div class="box t-mute">Nothing yet. Run a test.</div>'}</div>`;
+  let body = '';
+  if (c.type === 'PostgreSQL') body = `<dl class="kv"><dt>Server</dt><dd>${esc(i.version)}</dd><dt>Signed in as</dt><dd class="mono">${esc(i.user)}${i.superuser ? ' (superuser)' : ''}</dd>
+      <dt>Size</dt><dd>${esc(i.size)}</dd><dt>Tables</dt><dd>${fmt(i.tables)}</dd></dl>
+      <table style="margin-top:12px"><thead><tr><th>Schema</th><th class="num">Tables</th></tr></thead><tbody>${i.schemas.map(x => `<tr><td class="mono">${esc(x.schema)}</td><td class="num">${x.tables}</td></tr>`).join('')}</tbody></table>
+      <div class="cell-sub" style="margin-top:8px">Checked in a read-only session (<span class="mono">default_transaction_read_only=on</span>).</div>`;
+  else if (c.type === 'OpenMetadata') body = `<dl class="kv"><dt>Version</dt><dd>${esc(i.version)}</dd><dt>Users</dt><dd>${fmt(i.users)}</dd><dt>Teams</dt><dd>${fmt(i.teams)}</dd><dt>Tables</dt><dd>${fmt(i.tables)}</dd></dl>
+      <table style="margin-top:12px"><thead><tr><th>Database service</th><th>Host</th><th>In Bancha</th></tr></thead><tbody>${i.databaseServices.map(x => { const m = CONNS.find(k => k.cat === 'data_source' && `${k.host}:${k.port}`.startsWith(x.hostPort.includes(':') ? x.hostPort : x.hostPort + ':') && k.db === x.database);
+        return `<tr><td class="mono">${esc(x.name)}<div class="cell-sub">user ${esc(x.username)}</div></td><td class="mono">${esc(x.hostPort)} / ${esc(x.database)}</td><td>${m ? pill(...connStatus(m)) : pill('mute','Not added')}</td></tr>`; }).join('')}</tbody></table>`;
+  else body = `<dl class="kv">${Object.entries(i).map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono">${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</dd>`).join('')}</dl>`;
+  return `<div class="sec"><h3>Found on the real system</h3>${miss}<div class="box">${body}</div></div>`;
+}
+function connDrawer(id){
+  const c = CONNS.find(x => x.id === id); if (!c) return '';
+  const la = liveApps().filter(a => a.status !== 'pending');
+  const [t, l] = connStatus(c);
+  const grantsBox = c.cat === 'directory'
+    ? `<div class="box">Used by Bancha's identity service to import users and groups. Apps never receive this connection.<dl class="kv" style="margin-top:12px"><dt>Filter</dt><dd class="mono">${esc(c.dir.filter)}</dd><dt>Schedule</dt><dd>${esc(c.dir.every)}</dd><dt>Last sync</dt><dd>${esc(c.dir.last)} · ${c.dir.changed} changed</dd></dl></div>`
+    : `<div class="box"><table><thead><tr><th>App</th>${c.profiles.map(p => `<th>${esc(p.p)}</th>`).join('')}</tr></thead><tbody>
+      ${la.map(a => `<tr><td>${appChip(a.key, a.name)}</td>${c.profiles.map(p => `<td><label class="check" style="padding:0"><input type="checkbox" id="g-${c.id}-${a.key}-${p.p}" data-grant="${c.id}|${a.key}|${p.p}" ${(c.grants[a.key] || []).includes(p.p) ? 'checked' : ''} aria-label="Grant ${esc(p.p)} to ${esc(a.name)}"></label></td>`).join('')}</tr>`).join('')}
+      </tbody></table><div class="cell-sub" style="margin-top:8px">Ticking a box sends <span class="mono">connection.granted</span> to that app. Unticking sends <span class="mono">connection.revoked</span> and the app must drop cached credentials.</div></div>`;
+  return drawer(c.id, `${esc(c.type)} · <span class="mono">${esc(c.host)}${c.port ? ':' + c.port : ''}</span>`, `
+    <div class="sec"><h3>Status</h3><div class="box"><dl class="kv"><dt>Status</dt><dd>${pill(t, l)}</dd>
+      <dt>Last test</dt><dd>${c.test.ok ? `Passed in ${c.test.ms} ms at ${c.test.at}` : `<span class="t-bad">Failed at ${c.test.at}</span><div class="cell-sub">${esc(c.test.err)}</div>`}</dd>
+      <dt>Database</dt><dd class="mono">${esc(c.db)}</dd><dt>Owner</dt><dd>${esc(c.owner)}</dd><dt>Secret store</dt><dd class="mono">${c.live ? '.env · ' + esc(c.missing.length ? c.missing.map(m => m.env).join(', ') + ' (empty)' : 'set') : 'vault:kv/bancha/connections/' + esc(c.id)}</dd></dl>${c.note ? `<div class="cell-sub" style="margin-top:10px">${esc(c.note)}</div>` : ''}</div></div>
+    ${c.live ? liveSection(c) : ''}
+    <div class="sec"><h3>Credential profiles</h3><div class="box"><table><thead><tr><th>Profile</th><th>Account</th><th>Age</th><th></th></tr></thead><tbody>
+      ${c.profiles.map(p => `<tr><td><span class="tag">${esc(p.p)}</span></td><td class="mono">${esc(p.u)}</td><td class="num ${p.rot > 90 ? 't-warn' : ''}">${c.live ? '—' : p.rot + ' days'}</td>
+      <td style="text-align:right"><button class="btn sm" data-act="rotate" data-id="${esc(c.id)}" data-p="${esc(p.p)}">${ic('key')}Rotate</button></td></tr>`).join('')}
+    </tbody></table></div></div>
+    <div class="sec"><h3>${c.cat === 'directory' ? 'Usage' : 'Access by app'}</h3>${grantsBox}</div>
+    ${c.cat === 'data_source' ? `<div class="sec"><h3>OpenMetadata</h3><div class="box">${(c.grants.openmetadata || []).includes('metadata') ? `${ic('check')} Registered in OpenMetadata as DatabaseService <span class="mono">${esc(c.id)}</span>. Arak, Prajak and the catalog all refer to the same connection id.` : 'Grant the <span class="mono">metadata</span> profile to OpenMetadata to create a DatabaseService and start ingestion.'}</div></div>` : ''}`,
+    `${btn('zap','Test from Bancha','test','', 'data-id="' + c.id + '"')}${c.cat !== 'directory' ? btn('activity','Test from apps','testapps','', 'data-id="' + c.id + '"') : ''}<span class="grow"></span>${btn('trash','Delete','toast','danger','data-msg="Blocked: revoke all grants before deleting a connection"')}`,
+    `<span class="tile" style="--c:var(--accent)">${ic(c.cat === 'directory' ? srcIcon(c.type) : c.cat === 'metadata' ? 'book' : 'db')}</span>`);
+}
+function dlvDrawer(id){
+  const d = DLV.find(x => x.id === id); if (!d) return '';
+  const tl = d.status === 'delivered' ? [['ok', `Attempt ${d.attempts} · 200 OK · ${d.ms} ms`, d.time]]
+    : Array.from({ length: d.attempts }, (_, i) => ['bad', `Attempt ${i + 1} · ${d.status === 'dead' ? 'timeout after 10 s' : '503 Service Unavailable'}`, i === 0 ? d.time : ['+30 s','+2 min','+10 min','+30 min','+1 h','+3 h','+6 h'][i - 1]]);
+  return drawer(`Delivery ${d.id}`, `<span class="mono">${esc(d.type)}</span> → ${esc(app(d.app)?.name || d.app)}`, `
+    <div class="sec"><h3>Attempts</h3><div class="box"><ul class="timeline">${tl.map(([t, txt, when]) => `<li><span class="t-${t}">${ic(t === 'ok' ? 'check' : 'x')}</span><div>${esc(txt)}<br><small>${esc(when)}</small></div></li>`).join('')}
+      ${d.status === 'retrying' ? `<li><span class="t-mute">${ic('clock')}</span><div>Next attempt scheduled<br><small>${esc(d.err)}</small></div></li>` : ''}</ul></div></div>
+    <div class="sec"><h3>Payload as sent to ${esc(app(d.app)?.name || d.app)}</h3><pre class="code">${jsonHL(eventFor(d, d.app))}</pre>
+      <div class="cell-sub" style="margin-top:8px">Fields are filtered to the attributes this app was approved for.</div></div>`,
+    ['dead','retrying'].includes(d.status) ? btn('refresh','Retry now','retry','primary','data-id="' + d.id + '"') : '');
+}
+function manifestDrawer(key){
+  const a = app(key);
+  return drawer(`${a.name} manifest`, `Served at <span class="mono">${esc(a.baseUrl)}/.well-known/bancha-app.json</span>`,
+    `<pre class="code">${yamlFor(a)}</pre><div class="box"><dl class="kv"><dt>Approved</dt><dd>12 Aug 2026 by sakan.pu</dd><dt>Scope changes</dt><dd>None pending</dd><dt>Client id</dt><dd class="mono">${esc(a.key)}</dd><dt>Webhook secret</dt><dd>Rotated 13 Oct 2026 · 20:14</dd></dl></div>`,
+    btn('key','Rotate webhook secret','toast','', 'data-msg="Webhook secret rotated. The old secret stays valid for 24 h."'), tile(a));
+}
+function addConnDrawer(err = ''){
+  const la = liveApps().filter(a => a.status !== 'pending');
+  return drawer('Add connection', 'Secrets go to Vault. Apps only see host and database until they pull credentials.', `
+    <form id="connform" class="d-b" style="padding:0" novalidate>
+      <div class="row2"><label class="field"><span>Category</span><select class="inp" id="cf-cat"><option value="data_source">Data source</option><option value="metadata">OpenMetadata</option></select></label>
+        <label class="field"><span>Engine</span><select class="inp" id="cf-type">${['PostgreSQL','Oracle','SQL Server','MySQL','Snowflake','Databricks','Trino','BigQuery','OpenMetadata'].map(t => `<option>${t}</option>`).join('')}</select></label></div>
+      <label class="field"><span>Name</span><input class="inp mono" id="cf-name" placeholder="finance-dw" autocomplete="off"><small>Lowercase, used as the connection id in every app</small></label>
+      <div class="row2"><label class="field"><span>Host</span><input class="inp mono" id="cf-host" placeholder="10.6.150.42" autocomplete="off"></label>
+        <label class="field"><span>Port</span><input class="inp mono" id="cf-port" value="5432" inputmode="numeric"></label>
+        <label class="field"><span>Database</span><input class="inp mono" id="cf-db" placeholder="finance"></label></div>
+      <div class="row2"><label class="field"><span>Profile</span><select class="inp" id="cf-prof"><option>read</option><option>metadata</option><option>admin</option><option>write</option></select></label>
+        <label class="field"><span>Account</span><input class="inp mono" id="cf-user" placeholder="dq_reader" autocomplete="off"></label>
+        <label class="field"><span>Password</span><input class="inp mono" id="cf-pass" type="password" autocomplete="new-password"></label></div>
+      <div class="field"><span>Grant this profile to</span>${la.map(a => `<label class="check"><input type="checkbox" id="cf-g-${a.key}" value="${a.key}"> <span>${esc(a.name)}<small>${esc(a.purpose)}</small></span></label>`).join('')}</div>
+      ${err ? `<div class="err" role="alert">${esc(err)}</div>` : ''}
+    </form>`,
+    `${btn('', 'Cancel', 'close', 'ghost')}<button class="btn primary" type="submit" form="connform">${ic('check')}Test and save</button>`);
+}
+
+/* ───────────── Register wizard ───────────── */
+const WSTEPS = ['Source','Validate','Approve scopes','Credentials','Initial sync'];
+function newWizard(){ return { step:0, method:'url', url:'https://likit.internal/.well-known/bancha-app.json', token:null,
+  attrs:{ username:true, email:true, displayName:true, department:true, manager:false },
+  groupsMode:'selected', groups:['DG-Stewards','DG-Data-Engineers','DG-Analysts-Finance'],
+  conns:{ 'openmetadata-prod|read':true, 'dwh-prod|read':true, 'snowflake-analytics|read':false },
+  roleMap:{ admin:'DG-Platform-Admins', author:'DG-Stewards', reader:'DG-Analysts-Finance' },
+  creds:{ secret:'bsec_' + rnd(32), webhook:'whsec_' + rnd(32) }, pct:0, done:false }; }
+function wizardDrawer(){
+  const w = state.wiz; const s = w.step;
+  const steps = `<div class="steps">${WSTEPS.map((t, i) => `<div class="step ${i < s ? 'done' : i === s ? 'cur' : ''}"><span class="dot-badge">${i < s ? ic('check') : i + 1}</span>${t}</div>`).join('')}</div>`;
+  const omOk = liveApps().some(a => a.key === 'openmetadata' && a.status === 'active');
+  let body = '', next = 'Continue', canNext = true;
+  if (s === 0) {
+    body = `<div class="radio-cards"><button class="rcard" data-act="wzmethod" data-id="url" aria-pressed="${w.method === 'url'}"><b>Manifest URL</b><span>Bancha fetches the manifest and checks the app's endpoints now.</span></button>
+      <button class="rcard" data-act="wzmethod" data-id="token" aria-pressed="${w.method === 'token'}"><b>Registration token</b><span>The app registers itself on start-up. Good for CI/CD.</span></button></div>
+      ${w.method === 'url' ? `<label class="field"><span>Manifest URL</span><input class="inp mono" id="wz-url" value="${esc(w.url)}"><small>Usually <span class="mono">https://&lt;app&gt;/.well-known/bancha-app.json</span></small></label>`
+      : `<div class="sec"><h3>One-time token for app key "likit"</h3>${w.token ? `<div class="secret"><code>${w.token}</code><button class="btn sm" data-act="copy" data-v="${w.token}">${ic('copy')}Copy</button></div>
+          <pre class="code" style="margin-top:12px">BANCHA_URL=https://bancha.internal
+BANCHA_REGISTRATION_TOKEN=${w.token}</pre><div class="cell-sub" style="margin-top:8px">Expires in 1 hour. Set these on Likit and restart it. Its request then appears here for approval. For this prototype, Continue simulates that request.</div>`
+          : `<button class="btn" data-act="wztoken">${ic('key')}Generate token</button>`}</div>`}`;
+    next = w.method === 'url' ? 'Fetch and validate' : 'Continue';
+    canNext = w.method === 'url' || !!w.token;
+  } else if (s === 1) {
+    const chk = [['ok','Schema bancha.io/v1 is valid','kind: App · 3 roles · 2 connection requirements'],['ok','App key "likit" is available',''],
+      ['ok','https://likit.internal is reachable','TLS certificate valid until 01 Mar 2027'],['ok','GET /bancha/health → 200 in 84 ms','version 0.9.0'],
+      ['ok','POST /bancha/events accepted a signed ping','Signature verified by the app with the provisional secret'],
+      [omOk ? 'ok' : 'bad', omOk ? 'Dependency openmetadata is active' : 'Dependency openmetadata is not registered', omOk ? '' : 'Register OpenMetadata first or remove dependsOn'],
+      ['warn','Requests user attribute "manager"','Review it in the next step. Unticked attributes are never sent.']];
+    body = `<div class="box"><dl class="kv"><dt>Key</dt><dd class="mono">likit</dd><dt>Name</dt><dd>Likit</dd><dt>Version</dt><dd>0.9.0</dd><dt>Base URL</dt><dd class="mono">https://likit.internal</dd><dt>Delivery</dt><dd>Webhook</dd><dt>Roles</dt><dd>Likit Admin, Author, Reader</dd></dl></div>
+      <div class="sec"><h3>Checks</h3><div class="box"><ul class="checks">${chk.map(([t, a, b]) => `<li><span class="t-${t}">${ic(t === 'ok' ? 'check' : t === 'bad' ? 'x' : 'alert')}</span><div>${esc(a)}${b ? `<small>${esc(b)}</small>` : ''}</div></li>`).join('')}</ul></div></div>`;
+    canNext = omOk;
+  } else if (s === 2) {
+    const g = GROUPS.map(x => x.name);
+    body = `<div class="sec"><h3>User attributes</h3><div class="box">${Object.keys(w.attrs).map(k => `<label class="check"><input type="checkbox" id="wz-a-${k}" data-wz="attr|${k}" ${w.attrs[k] ? 'checked' : ''}><span class="mono">${k}</span></label>`).join('')}
+        <div class="cell-sub">Send only what Likit needs (PDPA data minimisation).</div></div></div>
+      <div class="sec"><h3>Which users Likit receives</h3><div class="box">
+        <label class="check"><input type="radio" name="wzg" id="wz-gm-all" data-wz="gmode|all" ${w.groupsMode === 'all' ? 'checked' : ''}><span>All users<small>1,284 users</small></span></label>
+        <label class="check"><input type="radio" name="wzg" id="wz-gm-sel" data-wz="gmode|selected" ${w.groupsMode === 'selected' ? 'checked' : ''}><span>Members of selected groups<small>${fmt(wzUsers())} users</small></span></label>
+        ${w.groupsMode === 'selected' ? `<div class="chips" style="margin:6px 0 0 26px">${g.map(n => `<label class="chip" style="cursor:pointer"><input type="checkbox" id="wz-g-${n}" data-wz="grp|${n}" ${w.groups.includes(n) ? 'checked' : ''} style="margin:0;accent-color:var(--accent)">${esc(n)}</label>`).join('')}</div>` : ''}</div></div>
+      <div class="sec"><h3>Connections</h3><div class="box">${Object.keys(w.conns).map(k => { const [c, p] = k.split('|'); return `<label class="check"><input type="checkbox" id="wz-c-${c}" data-wz="conn|${k}" ${w.conns[k] ? 'checked' : ''}><span><span class="mono">${c}</span> · profile <b>${p}</b><small>${esc(CONNS.find(x => x.id === c)?.type || '')} · requested as "${c === 'openmetadata-prod' ? 'Reads glossary and table descriptions' : 'Reads table samples for documentation'}"</small></span></label>`; }).join('')}</div></div>
+      <div class="sec"><h3>Initial role bindings</h3><div class="box"><table><tbody>${[['admin','Likit Admin'],['author','Author'],['reader','Reader']].map(([rk, rn]) => `<tr><td>${rn}</td><td><select class="inp" id="wz-r-${rk}" data-wz="role|${rk}"><option value="">— None</option>${g.map(n => `<option ${w.roleMap[rk] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div>`;
+    next = 'Approve and issue credentials';
+  } else if (s === 3) {
+    const row = (label, v, hidden) => `<label class="field"><span>${label}</span><div class="secret"><code>${v}</code><button class="btn sm" data-act="copy" data-v="${v}">${ic('copy')}Copy</button></div></label>`;
+    body = `<div class="banner warn" style="margin:0">${ic('alert')}<div><b>Shown once.</b> Bancha stores only a hash of the client secret. Put these in Likit's secret store now.</div></div>
+      ${row('Client id','likit')}${row('Client secret', w.creds.secret)}${row('Webhook secret', w.creds.webhook)}
+      <div class="box"><dl class="kv"><dt>OIDC issuer</dt><dd class="mono">https://bancha.internal/realms/bancha</dd><dt>Token endpoint</dt><dd class="mono">…/protocol/openid-connect/token</dd><dt>App API</dt><dd class="mono">https://bancha.internal/api/v1/app</dd></dl></div>
+      <div class="cell-sub">In the self-registration flow the app collects these from <span class="mono">GET /api/v1/registrations/{id}</span>. Nobody copies them by hand.</div>`;
+    next = 'Start initial sync';
+  } else {
+    const nU = wzUsers(), nG = w.groupsMode === 'all' ? 46 : w.groups.length, nB = Object.values(w.roleMap).filter(Boolean).length, nC = Object.values(w.conns).filter(Boolean).length;
+    const p = w.pct / 100;
+    const r = (l, n) => `<div class="prog"><span>${l}</span><div class="bar ${w.pct >= 100 ? 'ok' : ''}"><i style="width:${w.pct}%"></i></div><span>${fmt(Math.round(n * p))} / ${fmt(n)}</span></div>`;
+    body = `<div class="box">${r('Users', nU)}${r('Groups', nG)}${r('Role bindings', nB)}${r('Connections', nC)}</div>
+      <div class="box">${w.done ? `<span class="t-ok">${ic('check')}</span> Likit reported <span class="mono">appliedSeq ${fmt(SEQ)}</span>, equal to the snapshot seq. Status changes to Active and SSO is enabled.` : `Likit is reading <span class="mono">/api/v1/app/snapshot/*</span> at snapshot seq ${fmt(SEQ)}. After that it continues from the feed.`}</div>`;
+    next = 'Finish'; canNext = w.done;
+  }
+  const foot = `${s > 0 && s < 4 ? btn('', 'Back', 'wzback', 'ghost') : ''}<span class="grow"></span>${btn('', 'Cancel', 'close', 'ghost')}<button class="btn primary" data-act="wznext" ${canNext ? '' : 'disabled'}>${esc(next)}</button>`;
+  return drawer('Register app', `Step ${s + 1} of 5 · ${WSTEPS[s]}`, body, foot, '', steps);
+}
+function wzUsers(){ const w = state.wiz; return w.groupsMode === 'all' ? 1284 : GROUPS.filter(g => w.groups.includes(g.name)).reduce((s, g) => s + g.members, 0); }
+
+/* ───────────── Unregister modal ───────────── */
+function unregisterModal(key){
+  const a = app(key);
+  const binds = GROUPS.filter(g => g.bind[key]);
+  const grants = CONNS.filter(c => (c.grants[key] || []).length);
+  const dependents = liveApps().filter(x => x.deps.includes(key) && x.key !== key);
+  return `<div class="scrim" data-act="close"></div><div class="modal" role="dialog" aria-modal="true" aria-label="Unregister ${esc(a.name)}">
+    <div class="d-h">${tile(a)}<div><h2>Unregister ${esc(a.name)}</h2><p>Bancha will take these steps in order</p></div><button class="xbtn x" data-act="close" aria-label="Close">${ic('x')}</button></div>
+    <div class="d-b">
+      ${dependents.length ? `<div class="banner bad" style="margin:0">${ic('alert')}<div><b>${dependents.map(d => d.name).join(' and ')} depend${dependents.length === 1 ? 's' : ''} on ${esc(a.name)}.</b> Their manifests declare <span class="mono">dependsOn: ${key}</span>. Features that use it will stop working.</div></div>` : ''}
+      <ul class="impact">
+        <li>${ic('logout')}<div>Turn off SSO for ${esc(a.name)} immediately</div></li>
+        <li>${ic('zap')}<div>Send <span class="mono">app.deregistering</span> and stop all other events</div></li>
+        <li>${ic('shield')}<div>Remove <b>${binds.length} role bindings</b>${binds.length ? ` <span class="t-mute">(${binds.map(g => g.name).join(', ')})</span>` : ''}. A snapshot goes to the audit log.</div></li>
+        <li>${ic('plug')}<div>Revoke <b>${grants.reduce((s, c) => s + c.grants[key].length, 0)} connection grants</b>${grants.length ? ` <span class="t-mute">(${grants.map(c => c.id).join(', ')})</span>` : ''}</div></li>
+        <li>${ic('key')}<div>Revoke client credentials and the webhook secret when the app confirms purge or the grace period ends</div></li>
+      </ul>
+      <label class="field"><span>Grace period for the app to purge cached data</span><select class="inp" id="un-grace"><option value="24">24 hours</option><option value="72">72 hours</option><option value="0">None, remove now</option></select></label>
+      ${dependents.length ? `<label class="check"><input type="checkbox" id="un-override" data-un="1"><span>I understand that ${dependents.map(d => d.name).join(' and ')} will lose this dependency</span></label>` : ''}
+      <label class="field"><span>Type <span class="mono">${key}</span> to confirm</span><input class="inp mono" id="un-key" data-un="1" autocomplete="off"></label>
+    </div>
+    <div class="d-f">${btn('', 'Cancel', 'close', 'ghost')}<button class="btn danger solid" id="un-go" data-act="unregister-go" data-id="${key}" disabled>${ic('logout')}Unregister ${esc(a.name)}</button></div></div>`;
+}
+
+/* ───────────── Events, toasts ───────────── */
+function toast(title, sub = ''){
+  const el = document.createElement('div'); el.className = 'toast';
+  el.innerHTML = `${ic('zap')}<div>${title}${sub ? `<small>${sub}</small>` : ''}</div>`;
+  $('#toasts').appendChild(el); setTimeout(() => el.remove(), 5200);
+}
+function audit(action, target, detail){ AUDIT.unshift({ time:clock().slice(0, 5), actor:me()?.user || 'system', action, target, detail }); }
+function emit(type, subject, targets){
+  targets = targets || liveApps().filter(a => ['active','provisioning'].includes(a.status)).map(a => a.key);
+  SEQ++; const seq = SEQ, t = clock();
+  FEED.unshift({ seq, type, subject, v:1, actor:me()?.user || 'system', time:t, n:targets.length });
+  targets.forEach(k => DLV.unshift({ id:'dlv_' + rnd(8), seq, type, subject, app:k, status:'pending', attempts:0, ms:null, time:t }));
+  toast(`<b>${esc(type)}</b> · seq ${fmt(seq)}`, targets.length ? `Queued for ${targets.map(k => app(k)?.name || k).join(', ')}` : 'Recorded in the change feed. No app is subscribed.');
+  setTimeout(() => {
+    DLV.filter(d => d.seq === seq && d.status === 'pending').forEach(d => { const a = app(d.app); if (a && a.status === 'suspended') return; d.status = 'delivered'; d.attempts = 1; d.ms = 70 + Math.floor(Math.random() * 300); });
+    targets.forEach(k => { const a = app(k); if (a && ['active','provisioning','deregistering'].includes(a.status)) { a.applied = seq; a.hb = 'just now'; } });
+    DLV.filter(d => d.status === 'retrying' && targets.includes(d.app)).forEach(d => { d.status = 'delivered'; d.attempts++; d.ms = 140; d.err = null; });
+    rerender();
+  }, 1300);
+  rerender();
+}
+function rerender(){ render(); if (state.layer) renderLayer(); }
+
+/* ───────────── Render ───────────── */
+const PAGES = { myapps:pMyApps, overview:pOverview, identity:pIdentity, connections:pConnections, apps:pApps, sync:pSync };
+function render(){
+  const a = document.activeElement, aid = a && a.id, pos = a && typeof a.selectionStart === 'number' ? a.selectionStart : null;
+  const u = me();
+  if (!u) { render.last = null; $('#app').innerHTML = loginHTML(); }
+  else if (state.page === 'handoff' && state.handoff) $('#app').innerHTML = handoffHTML();
+  else {
+    if (!PAGES[state.page]) state.page = isAdmin(u) ? 'overview' : 'myapps';
+    if (!isAdmin(u) && state.page !== 'myapps') state.page = 'myapps';
+    const enter = render.last !== state.page; render.last = state.page;
+    $('#app').innerHTML = `<div class="shell">${navHTML()}<div class="maincol">${topbar()}<main class="wrap ${enter ? 'page-enter' : ''}" id="main">${PAGES[state.page]()}</main></div></div>`;
+  }
+  if (aid) { const el = document.getElementById(aid); if (el && el !== document.activeElement) { el.focus({ preventScroll:true }); if (pos !== null) try { el.setSelectionRange(pos, pos); } catch {} } }
+}
+function renderLayer(){
+  const L = state.layer; let html = '';
+  if (!L) { $('#layer').innerHTML = ''; return; }
+  const a = document.activeElement, aid = a && a.id;
+  const scroll = $('#layer .d-b') ? $('#layer .d-b').scrollTop : 0;
+  if (L.kind === 'user') html = userDrawer(L.id);
+  if (L.kind === 'conn') html = connDrawer(L.id);
+  if (L.kind === 'dlv') html = dlvDrawer(L.id);
+  if (L.kind === 'manifest') html = manifestDrawer(L.id);
+  if (L.kind === 'addconn') html = addConnDrawer(L.err);
+  if (L.kind === 'wizard') html = wizardDrawer();
+  if (L.kind === 'unregister') { if ($('#un-key')) return; html = unregisterModal(L.id); }
+  if (L.kind === 'picker') html = pickerModal();
+  if (L.kind === 'addconn' && $('#connform') && !L.err) return;
+  $('#layer').innerHTML = html;
+  const b = $('#layer .d-b'); if (b) b.scrollTop = scroll;
+  const keep = aid && document.getElementById(aid);
+  if (keep) keep.focus({ preventScroll:true }); else { const f = $('#layer .x'); if (f && !L.opened) { f.focus(); L.opened = true; } }
+}
+function openLayer(kind, id){ state.layer = { kind, id }; renderLayer(); }
+function closeLayer(){ state.layer = null; state.wiz = null; if (wzTimer) { clearInterval(wzTimer); wzTimer = null; } $('#layer').innerHTML = ''; }
+function go(page, sub){ state.page = page; state.handoff = null; state.menuOpen = false; if (sub) state.sub[page] = sub; try { history.replaceState(null, '', '#' + page); } catch {} render(); window.scrollTo({ top:0 }); }
+
+/* ───────────── Actions ───────────── */
+let wzTimer = null;
+const ACT = {
+  nav: d => go(d.page),
+  sub: d => { state.sub[d.page] = d.id; render(); },
+  theme: () => { const root = document.documentElement; root.dataset.theme = isDark() ? 'light' : 'dark'; try { localStorage.setItem('bancha-theme', root.dataset.theme); } catch {} render(); },
+  menu: () => { state.menuOpen = !state.menuOpen; render(); },
+  lgmode: d => { state.login.mode = d.id; state.login.err = ''; render(); if (d.id === 'form') $('#lg-user')?.focus(); },
+  sso: () => openLayer('picker'),
+  pickuser: d => signIn(USERS.find(u => u.user === d.id), 'azure'),
+  signout: () => { const u = me(); if (u) AUDIT.unshift({ time:clock().slice(0, 5), actor:u.user, action:'auth.logout', target:'all apps', detail:'Back-channel logout sent' });
+    if (hoTimer) { clearInterval(hoTimer); hoTimer = null; }
+    state.session = null; state.handoff = null; state.page = null; saveSession(); closeLayer(); render();
+    toast('Signed out of Bancha and every app', liveApps().filter(a => a.status === 'active').map(a => a.name).join(', ') + ' received a back-channel logout'); },
+  myapps: () => go('myapps'),
+  launch: d => launch(d.id, false),
+  reqaccess: d => toast(`Access request for ${esc(app(d.id)?.name || d.id)} sent`, 'Arak routes it to the approvers. You get an email when it is decided.'),
+  env: () => toast('Environments are separate Bancha instances', 'Dev · UAT · Production each have their own feed and secrets'),
+  close: () => closeLayer(),
+  user: d => openLayer('user', d.id),
+  conn: d => { if (state.page !== 'connections') go('connections', CONNS.find(c => c.id === d.id)?.cat); openLayer('conn', d.id); },
+  dlv: d => openLayer('dlv', d.id),
+  manifest: d => openLayer('manifest', d.id),
+  goapps: () => go('apps', 'registry'),
+  gosync: d => go('sync', d.id || 'deliveries'),
+  gousers: () => { state.f.uApp = 'none'; go('identity', 'users'); },
+  addconn: () => openLayer('addconn'),
+  register: () => { if (app('likit') && app('likit').status !== 'removed') { toast('Likit is already registered', 'Unregister it first to run the example again'); return; } state.wiz = newWizard(); openLayer('wizard'); },
+  regtoken: () => { state.wiz = newWizard(); state.wiz.method = 'token'; state.wiz.token = 'rt_' + rnd(28); openLayer('wizard'); },
+  adduser: () => toast('Local users are for service and break-glass accounts', 'People should come from Azure AD or LDAP'),
+  syncdirs: () => { audit('directory.sync','all directories','Manual sync'); emit('user.updated', 'users/napat.r'); },
+  syncdir: (d, el, e) => { e.stopPropagation(); audit('directory.sync', d.id, 'Manual sync'); toast(`Sync started for ${esc(d.id)}`, 'Changed users and groups will appear in the change feed'); },
+  testall: async () => { if (!LIVE.on) return toast('Testing 11 connections from Bancha', 'crm-sqlserver and hr-mysql are expected to fail again');
+    toast(`Testing ${CONNS.length} connections`, 'Read-only checks against the real systems');
+    const out = await Promise.all(CONNS.map(c => liveTest(c.id).catch(() => null)));
+    LIVE.at = new Date().toTimeString().slice(0, 5); render(); renderLayer();
+    toast(`${out.filter(c => c && c.test.ok).length} of ${CONNS.length} connected`, out.filter(c => c && !c.test.ok).map(c => c.id).join(', ') || 'All passed'); },
+  test: async d => { if (LIVE.on) { toast(`Testing ${esc(d.id)}…`, 'Read-only check from Bancha');
+      try { const c = await liveTest(d.id); render(); renderLayer(); toast(c.test.ok ? `${esc(c.id)}: connected in ${c.test.ms} ms` : `${esc(c.id)}: ${esc(c.test.err)}`, c.test.ok ? 'Real check from Bancha' : 'See what is missing in the drawer'); }
+      catch (e) { toast('Test failed to run', esc(e.message)); } return; }
+    const c = CONNS.find(x => x.id === d.id); toast(c.test.ok ? `${esc(c.id)}: connected in ${c.test.ms} ms` : `${esc(c.id)}: ${esc(c.test.err)}`, c.test.ok ? 'Tested from Bancha' : 'Check the firewall rule or the account, then test again'); },
+  testapps: d => { emit('connection.test.requested', 'connections/' + d.id, Object.keys(CONNS.find(x => x.id === d.id).grants).filter(k => app(k)?.status === 'active')); },
+  rotate: d => { const c = CONNS.find(x => x.id === d.id); c.profiles.find(p => p.p === d.p).rot = 0; audit('connection.rotate', c.id, `Profile ${d.p} rotated`);
+    emit('connection.secret.rotated', 'connections/' + c.id, Object.entries(c.grants).filter(([k, v]) => v.includes(d.p) && app(k)).map(([k]) => k)); },
+  resenduser: d => emit('user.updated', 'users/' + d.id),
+  resync: d => { audit('app.resync', d.id, 'Full resync requested'); emit('sync.resync.requested', 'apps/' + d.id, [d.id]); },
+  suspend: d => { const a = app(d.id); a.status = 'suspended'; a.hb = 'suspended'; audit('app.suspend', a.key, ''); emit('app.suspended', 'apps/' + a.key, [a.key]); },
+  resume: d => { const a = app(d.id); a.status = 'active'; audit('app.resume', a.key, `Catching up from seq ${a.applied}`); emit('app.activated', 'apps/' + a.key, [a.key]); },
+  unregister: d => openLayer('unregister', d.id),
+  'unregister-go': d => { const a = app(d.id); const g = Number($('#un-grace').value); closeLayer();
+    a.status = 'deregistering'; a.grace = g ? `grace period ends in ${g} h` : 'removing now';
+    audit('app.unregister', a.key, `Grace ${g} h`); emit('app.deregistering', 'apps/' + a.key, [a.key]);
+    if (!g) removeApp(a.key); },
+  purged: d => removeApp(d.id, 'App confirmed purge'),
+  forceremove: d => removeApp(d.id, 'Forced by admin'),
+  retry: (d, el, e) => { e.stopPropagation(); const x = DLV.find(y => y.id === d.id); x.status = 'delivered'; x.attempts++; x.ms = 160; x.err = null;
+    const a = app(x.app); if (a && a.status === 'active') { DLV.filter(y => y.app === a.key && y.status === 'retrying').forEach(y => { y.status = 'delivered'; y.attempts++; y.ms = 150; y.err = null; }); a.applied = SEQ; a.hb = 'just now'; }
+    toast(`Delivered ${esc(x.type)} to ${esc(a?.name || x.app)}`, '200 OK · the app is caught up with the feed'); rerender(); },
+  retryall: () => { DLV.filter(d => ['dead','retrying'].includes(d.status)).forEach(d => { d.status = 'delivered'; d.attempts++; d.ms = 150; d.err = null; });
+    liveApps().filter(a => a.status === 'active').forEach(a => { a.applied = SEQ; a.hb = 'just now'; }); toast('All failed deliveries were sent again', 'Every active app is now in sync'); rerender(); },
+  copy: d => { const done = () => toast('Copied to clipboard'); try { navigator.clipboard.writeText(d.v).then(done, () => toast('Copy failed', 'Select the text and copy it manually')); } catch { toast('Copy failed', 'Select the text and copy it manually'); } },
+  toast: d => toast(esc(d.msg)),
+  wzmethod: d => { state.wiz.method = d.id; renderLayer(); },
+  wztoken: () => { state.wiz.token = 'rt_' + rnd(28); renderLayer(); },
+  wzback: () => { state.wiz.step--; renderLayer(); },
+  wznext: () => { const w = state.wiz;
+    if (w.step === 4) { finishWizard(); return; }
+    w.step++; renderLayer();
+    if (w.step === 4) { wzTimer = setInterval(() => { w.pct = Math.min(100, w.pct + 7); if (w.pct >= 100) { w.done = true; clearInterval(wzTimer); wzTimer = null; } if (state.layer?.kind === 'wizard') renderLayer(); }, 140); } },
+};
+function removeApp(key, why){
+  const i = APPS.findIndex(a => a.key === key); if (i < 0) return;
+  const [a] = APPS.splice(i, 1); a.status = 'removed'; REMOVED.push(a);
+  GROUPS.forEach(g => delete g.bind[key]); CONNS.forEach(c => delete c.grants[key]);
+  audit('app.removed', key, `${why || 'Grace period 0 h'} · credentials revoked · bindings archived`);
+  toast(`${esc(a.name)} removed`, 'Credentials revoked. Bindings and grants are archived in the audit log.'); rerender();
+}
+function finishWizard(){
+  const w = state.wiz;
+  const a = { key:'likit', name:'Likit', purpose:'Example registration · replace with Likit’s manifest', kind:'App', version:'0.9.0', baseUrl:'https://likit.internal', mode:'webhook', status:'active', hb:'just now', applied:SEQ, users:wzUsers(), owner:'likit-team@example.co.th',
+    roles:[['admin','Likit Admin'],['author','Author'],['reader','Reader']], deps:['openmetadata'], subs:['user.*','group.*','rolebinding.*','connection.*','app.*'], pub:[],
+    attrs:Object.keys(w.attrs).filter(k => w.attrs[k]), provides:[], consumes:[] };
+  const old = REMOVED.findIndex(x => x.key === 'likit'); if (old >= 0) REMOVED.splice(old, 1);
+  APPS.push(a);
+  Object.entries(w.roleMap).forEach(([rk, gn]) => { const g = GROUPS.find(x => x.name === gn); if (g) g.bind.likit = rk; });
+  Object.entries(w.conns).filter(([, v]) => v).forEach(([k]) => { const [c, p] = k.split('|'); const cc = CONNS.find(x => x.id === c); if (cc) (cc.grants.likit = cc.grants.likit || []).push(p); });
+  audit('app.register', 'likit', `Approved ${a.attrs.length} attributes, ${Object.values(w.conns).filter(Boolean).length} connection grants`);
+  closeLayer(); go('apps', 'registry'); emit('app.activated', 'apps/likit', ['likit']);
+}
+
+/* ───────────── Wiring ───────────── */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const fn = ACT[t.dataset.act]; if (!fn) return;
+  if (t.tagName === 'TR' && e.target.closest('button,select,input,a')) return;
+  fn(t.dataset, t, e);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.layer) closeLayer();
+  if (e.key === 'Enter' && e.target.matches('tr[data-act]')) e.target.click();
+  if (e.key === 'Enter' && e.target.id === 'gsearch') { state.q.users = e.target.value.trim(); state.sub.identity = 'users'; go('identity'); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.q !== undefined) { state.q[t.dataset.q] = t.value; render(); }
+  if (t.id === 'wz-url') state.wiz.url = t.value;
+  if (t.dataset.lg) state.login.user = t.value;
+  if (t.dataset.un) { const a = state.layer && app(state.layer.id); const ov = $('#un-override'); $('#un-go').disabled = !($('#un-key').value.trim() === a.key && (!ov || ov.checked)); }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.f) { state.f[t.dataset.f] = t.value; render(); }
+  if (t.dataset.bind) { const [gi, ak] = t.dataset.bind.split('|'); const g = GROUPS[gi]; const before = g.bind[ak];
+    if (t.value) g.bind[ak] = t.value; else delete g.bind[ak];
+    audit(t.value ? 'rolebinding.grant' : 'rolebinding.revoke', `${ak}/${t.value || before}`, `Group ${g.name}`);
+    emit(t.value ? 'rolebinding.granted' : 'rolebinding.revoked', `${ak}/${t.value || before} ← ${g.name}`, [ak]); }
+  if (t.dataset.grant) { const [cid, ak, p] = t.dataset.grant.split('|'); const c = CONNS.find(x => x.id === cid); const list = c.grants[ak] = c.grants[ak] || [];
+    if (t.checked) list.push(p); else list.splice(list.indexOf(p), 1);
+    audit(t.checked ? 'connection.grant' : 'connection.revoke', cid, `Profile ${p} ${t.checked ? 'granted to' : 'revoked from'} ${app(ak).name}`);
+    emit(t.checked ? 'connection.granted' : 'connection.revoked', 'connections/' + cid, [ak]); }
+  if (t.dataset.wz) { const w = state.wiz; const [kind, key] = t.dataset.wz.split('|');
+    if (kind === 'attr') w.attrs[key] = t.checked;
+    if (kind === 'gmode') w.groupsMode = key;
+    if (kind === 'grp') { if (t.checked) w.groups.push(key); else w.groups = w.groups.filter(x => x !== key); }
+    if (kind === 'conn') w.conns[key] = t.checked;
+    if (kind === 'role') w.roleMap[key] = t.value;
+    renderLayer(); }
+  if (t.dataset.un) t.dispatchEvent(new Event('input', { bubbles:true }));
+});
+document.addEventListener('submit', e => {
+  if (e.target.id === 'loginform') { e.preventDefault();
+    const L = state.login, id = $('#lg-user').value.trim().toLowerCase(), pw = $('#lg-pass').value; L.user = id;
+    const fail = m => { L.err = m; render(); };
+    if (!id || !pw) return fail('Enter your username and password.');
+    const u = USERS.find(x => x.user === id || x.email === id);
+    if (!u) return fail('Username or password is incorrect.');
+    if (u.src === 'Azure AD') return fail(`${u.email} is an Azure AD account. Use "Sign in with MFEC" so MFA applies.`);
+    if (u.user.startsWith('svc')) return fail('Service accounts cannot sign in interactively. They use client credentials.');
+    return signIn(u, u.src === 'LDAP' ? 'ldap' : 'local'); }
+  if (e.target.id !== 'connform') return; e.preventDefault();
+  const v = id => $('#' + id).value.trim();
+  const name = v('cf-name'), host = v('cf-host');
+  if (!name || !host || !v('cf-user')) { state.layer.err = 'Name, host and account are required.'; renderLayer(); state.layer.err = ''; return; }
+  if (!/^[a-z][a-z0-9-]+$/.test(name)) { state.layer.err = 'Use lowercase letters, digits and dashes for the name, e.g. finance-dw.'; renderLayer(); state.layer.err = ''; return; }
+  if (CONNS.some(c => c.id === name)) { state.layer.err = `A connection named ${name} already exists.`; renderLayer(); state.layer.err = ''; return; }
+  const prof = v('cf-prof'); const targets = [...document.querySelectorAll('#connform input[type=checkbox]:checked')].map(x => x.value);
+  const c = { id:name, cat:$('#cf-cat').value, type:$('#cf-type').value, host, port:Number(v('cf-port')) || 0, db:v('cf-db') || '—', owner:'DG-Platform-Admins',
+    profiles:[P(prof, v('cf-user'), 0)], grants:Object.fromEntries(targets.map(k => [k, [prof]])), test:{ ok:true, ms:44, at:clock().slice(0, 5) } };
+  CONNS.push(c); audit('connection.create', name, `${c.type} ${host}`);
+  closeLayer(); state.sub.connections = c.cat; go('connections');
+  if (targets.length) emit('connection.granted', 'connections/' + name, targets);
+  else toast(`${esc(name)} saved and tested in 44 ms`, 'No app can use it yet. Open it to grant a profile.');
+});
+
+try { const t = localStorage.getItem('bancha-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => render()); } catch {}
+render();
+
+/* ───────────── Live connections (when served by server/server.js) ───────────── */
+function fromApi(x){
+  const t = x.test || { ok:false, ms:null, at:'—', err:'Not tested yet' };
+  const i = x.info || {};
+  return { id:x.id, cat:x.cat, type:x.type, host:x.host, port:x.port || '', db:x.db, owner:x.owner, note:x.note, live:true, missing:x.missing || [], info:x.info,
+    profiles:x.profiles.map(p => P(p.p, p.u, 0)), grants:x.grants || {}, test:{ ok:t.ok, ms:t.ms, at:t.at, err:t.err },
+    dir: x.cat === 'directory' ? { filter:'—', every:'Not scheduled yet', last: t.ok ? 'Reachable · ' + t.at : '—', users:i.users || 0, groups:i.groups || 0, changed:0 } : null };
+}
+function applyLive(list){ CONNS.splice(0, CONNS.length, ...list.map(fromApi)); LIVE.on = true; LIVE.at = new Date().toTimeString().slice(0, 5); }
+async function loadLive(){
+  if (location.protocol === 'file:') return;
+  try { const r = await fetch('api/connections', { cache:'no-store' }); if (!r.ok) return;
+    const d = await r.json(); if (!d.live) return; applyLive(d.connections); render(); renderLayer(); } catch {}
+}
+async function liveTest(id){
+  const r = await fetch(`api/connections/${encodeURIComponent(id)}/test`, { method:'POST' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const c = fromApi(await r.json()); const i = CONNS.findIndex(x => x.id === id); if (i >= 0) CONNS[i] = c; return c;
+}
+loadLive();
+</script>

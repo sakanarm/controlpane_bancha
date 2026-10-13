@@ -39,12 +39,17 @@ async function getJSON(url, opts = {}) {
 
 /* ── Connectors ── */
 
-async function testPostgres(c) {
+async function pgConnect(c) {
   const p = c.profiles[0];
   const cl = new Client({ host: c.host, port: c.port, database: c.db, user: p.user, password: env(p.secretEnv),
     connectionTimeoutMillis: TIMEOUT_MS, statement_timeout: TIMEOUT_MS, query_timeout: TIMEOUT_MS,
     options: '-c default_transaction_read_only=on', application_name: 'bancha-readonly-check' });
   await cl.connect();
+  return cl;
+}
+
+async function testPostgres(c) {
+  const cl = await pgConnect(c);
   try {
     const v = (await cl.query(`select current_user as "user", current_database() as db, split_part(version(), ' on ', 1) as version,
       pg_is_in_recovery() as replica, (select rolsuper from pg_roles where rolname = current_user) as superuser,
@@ -100,6 +105,65 @@ async function testAuthService(c) {
   return { health, users: (u.users || []).length };
 }
 
+/* ── Identity match: who exists in Arak and in OpenMetadata, matched by email. Read-only. ── */
+
+const IDENTITY_SOURCES = { arak: 'arakdb', openmetadata: 'openmetadata-mfec' };
+let identity = null;   // { at, sources: { app: { ok, users, err } }, people: [...] }
+
+async function arakUsers(c) {
+  const cl = await pgConnect(c);
+  try {
+    // attrs: Arak's current principal attributes (department, employeeType, clearance, ...); roles carry their scope.
+    return (await cl.query(`select p.username, p.email, p.display_name as name, p.external_id, p.source, p.enabled,
+        coalesce(array_agg(distinct coalesce(g.display_name, g.username)) filter (where g.id is not null), '{}') as groups,
+        coalesce(jsonb_agg(distinct jsonb_build_object('role', r.app_role, 'scope', r.scope_fqn)) filter (where r.app_role is not null), '[]') as roles,
+        coalesce((select jsonb_object_agg(a.attr_key, a.attr_value) from principal_attribute a where a.principal_id = p.id
+          and (a.valid_to is null or a.valid_to > now())), '{}') as attrs
+      from principal p
+      left join group_member gm on gm.member_id = p.id left join principal g on g.id = gm.group_id
+      left join app_role_assignment r on r.principal_id = p.id
+      where p.principal_type = 'USER' group by p.id order by 3`)).rows;
+  } finally { await cl.end().catch(() => {}); }
+}
+
+async function omUsers(c) {
+  const H = { headers: { Authorization: `Bearer ${await omToken(c)}` } };
+  const out = [];
+  let after = '';
+  do {
+    const r = await getJSON(`${c.url}/api/v1/users?isBot=false&limit=200&fields=teams,roles${after ? '&after=' + encodeURIComponent(after) : ''}`, H);
+    out.push(...r.data.map(u => ({ username: u.name, email: u.email, name: u.displayName || u.name, admin: !!u.isAdmin,
+      teams: (u.teams || []).map(t => t.displayName || t.name), roles: (u.roles || []).map(t => t.displayName || t.name) })));
+    after = r.paging?.after || '';
+  } while (after && out.length < 5000);
+  return out;
+}
+
+const keyOf = u => (u.email || '').trim().toLowerCase() || null;
+
+async function refreshIdentity() {
+  const sources = {}, lists = {};
+  for (const [app, id] of Object.entries(IDENTITY_SOURCES)) {
+    const c = CONFIG.find(x => x.id === id);
+    if (!c || missingOf(c).length) { sources[app] = { ok: false, users: null, err: 'Connection not configured' }; continue; }
+    try {
+      lists[app] = await (app === 'arak' ? arakUsers(c) : omUsers(c));
+      sources[app] = { ok: true, users: lists[app].length };
+    } catch (e) { sources[app] = { ok: false, users: null, err: String(e.code || e.message || e) }; }
+  }
+  // Keep the last good list of a source that failed this round, so one outage does not empty the report.
+  for (const app of Object.keys(IDENTITY_SOURCES)) if (!lists[app] && identity?.lists?.[app]) lists[app] = identity.lists[app];
+  const people = new Map();
+  for (const [app, list] of Object.entries(lists)) for (const u of list) {
+    const k = keyOf(u) || `${app}:${u.username}`;
+    const p = people.get(k) || { key: k, email: u.email || null, name: u.name || u.username };
+    p[app] = u; people.set(k, p);
+  }
+  identity = { at: now(), sources, lists, people: [...people.values()].sort((a, b) => String(a.name).localeCompare(String(b.name))) };
+  console.log(`[identity] ${Object.entries(sources).map(([k, v]) => `${k} ${v.ok ? v.users : v.err}`).join(' · ')}`);
+  return identity;
+}
+
 const CONNECTORS = { PostgreSQL: testPostgres, OpenMetadata: testOpenMetadata, 'Azure AD': testAzure, 'auth-service': testAuthService };
 
 async function runTest(c) {
@@ -148,6 +212,11 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname.replace(/^\/bancha(?=\/|$)/i, '') || '/';
     if (p === '/api/health') return send(res, 200, { ok: true });
+    if (p === '/api/identity' && req.method === 'GET') {
+      if (!identity || url.searchParams.has('refresh')) await refreshIdentity();
+      const { lists, ...out } = identity;
+      return send(res, 200, out);
+    }
     if (p === '/api/connections' && req.method === 'GET') return send(res, 200, { live: true, connections: CONFIG.map(view) });
     const m = p.match(/^\/api\/connections\/([\w-]+)\/test$/);
     if (m && req.method === 'POST') {
@@ -167,6 +236,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Bancha listening on http://${HOST}:${PORT}`);
-  const all = () => Promise.all(CONFIG.map(runTest));
+  const all = () => Promise.all(CONFIG.map(runTest)).then(refreshIdentity).catch(e => console.error('[identity]', e.message));
   all(); setInterval(all, RETEST_MS).unref();
 });

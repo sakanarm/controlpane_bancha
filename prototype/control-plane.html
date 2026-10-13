@@ -602,6 +602,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmt = n => Number(n).toLocaleString('en-US');
 const $ = s => document.querySelector(s);
 const rnd = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join('');
+// crypto.randomUUID exists only on https and localhost; the prod URL is plain http.
+const uuid = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b, i) => (i === 6 ? (b & 15) | 64 : i === 8 ? (b & 63) | 128 : b).toString(16).padStart(2, '0')).join('').replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
 
 /* ───────────── Sample data ───────────── */
 let SEQ = 48213;
@@ -635,7 +637,7 @@ const GROUPS = [
 ];
 
 const mkU = (name, user, src, dept, groups, extra={}) => ({ name, user, email:`${user}@example.co.th`, src, dept, groups, status:'active', ver: 4, seq: 47800,
-  sync: src==='Azure AD' ? '22:10' : src==='LDAP' ? '21:58' : 'managed here', oid: src==='Azure AD' ? crypto.randomUUID() : src==='LDAP' ? `CN=${name},OU=Branches,DC=example,DC=local` : '—', ...extra });
+  sync: src==='Azure AD' ? '22:10' : src==='LDAP' ? '21:58' : 'managed here', oid: src==='Azure AD' ? uuid() : src==='LDAP' ? `CN=${name},OU=Branches,DC=example,DC=local` : '—', ...extra });
 const USERS = [
   mkU('Somchai Prasert','somchai.p','Azure AD','Data Governance',['DG-Stewards','DG-Analysts-Finance'],{ver:12, seq:48213}),
   mkU('Sakan Punyanon','sakan.pu','Azure AD','Data Platform',['DG-Platform-Admins','DG-Data-Engineers'],{ver:9, seq:48120, email:'sakan_pu@mfec.co.th'}),

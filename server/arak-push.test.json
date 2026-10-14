@@ -1,0 +1,22 @@
+{
+  "reason": "Bancha test: central config pushed to Arak (safe to remove)",
+  "groups": [
+    { "name": "bancha-test-group", "displayName": "Bancha test group (safe to remove)" }
+  ],
+  "users": [
+    {
+      "username": "bancha-test",
+      "email": "bancha-test@bancha.invalid",
+      "displayName": "Bancha test user (safe to remove)",
+      "status": "active",
+      "department": "BANCHA_TEST",
+      "employeeType": "test",
+      "country": "TH",
+      "groups": ["bancha-test-group"],
+      "roles": [
+        { "role": "requester" },
+        { "role": "data-owner", "scope": "bancha_test.does_not_exist" }
+      ]
+    }
+  ]
+}

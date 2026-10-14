@@ -36,7 +36,9 @@
 - ✅ หน้า Connections แสดงผลจริงและบอกว่ายังขาด credential ตัวไหน
 - ✅ `deploy/start.sh` สำหรับ pm2 แบบเดียวกับ Arak
 - ✅ **Identity → Across apps** (14 Oct 2026): อ่าน user จาก Arak (45) และ OpenMetadata (13) แบบ read-only จับคู่ด้วย email ได้ 57 คน ตรงกันทั้งสองแอพ 1 คน
-  - ตาราง "What Bancha sends to each app" และพรีวิว event รายคน ยังไม่ส่งอะไรจริง (ARCHITECTURE §3.5 และ §12 ขั้น 0)
+  - ตาราง "What Bancha sends to each app" และพรีวิว event รายคน (ARCHITECTURE §3.5 และ §12 ขั้น 0)
+- ✅ **Push เข้า Arak ผ่าน admin API** (14 Oct 2026, ARCHITECTURE §3.6): `server/arak-push.js` ส่ง user, group, role, attribute, data source และ OpenMetadata URL โดยไม่ต้องแก้โค้ด Arak ทดสอบบน prod ด้วยของทดสอบ `bancha-test*` แล้ว
+  - Bancha login เป็น `bancha-sync` (สร้างด้วย `server/arak-sync-account.js`) ไม่ใช้ `admin` แล้ว
 
 ### ต้องทำต่อ
 
@@ -72,7 +74,7 @@
 | 1.6 | Login จริงด้วย Entra OIDC (Authorization Code + PKCE) และ session cookie กำหนด admin จาก group ใน Azure AD | 0.3 |
 | 1.7 | App registry: register ด้วย manifest + validate กับ JSON Schema และ health check `/.well-known/bancha/health` | 1.2 |
 | 1.8 | Outbox `change_log` + webhook (CloudEvents, HMAC) + `GET /feed?after=seq` + snapshot | 1.2 |
-| 1.9 | Arak integration ตาม ARCHITECTURE §12 ขั้น 1–3: link ด้วย email เก็บ Bancha id ใน `principal.external_id`, upsert เฉพาะ field ใน §3.5, แถว `local` ที่ยังไม่ link ไม่แตะ | 1.8 และต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
+| 1.9 | Arak integration ตาม ARCHITECTURE §12: ขั้น 1–2 ทำได้แล้วผ่าน admin API (§3.6) เหลือให้ Bancha push ข้อมูลจริงจาก DB ของตัวเอง ขั้น 3 (ล็อก field ใน UI ของ Arak และเก็บ `external_id`) | 1.2 และขั้น 3 ต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
 | 1.10 | Audit log ทุกการแก้ไข | 1.2 |
 
 ผลลัพธ์ที่ใช้ตัดสินว่าจบ Phase 1: เพิ่ม user เข้า group ใน Bancha แล้ว Arak เห็นภายใน 1 นาที และ connection ที่ Arak ใช้ถูกจัดการจาก Bancha

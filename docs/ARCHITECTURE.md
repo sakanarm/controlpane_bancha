@@ -149,15 +149,15 @@ Manifest ประกาศ attribute ที่แอพต้องใช้ (`
 
 | Field กลาง | ใครกำหนด | Arak เก็บที่ | OpenMetadata เก็บที่ |
 |---|---|---|---|
-| `id` | Bancha | `principal.external_id` (ตอนนี้ว่างทุกคน) | custom property `banchaId` |
+| `id` | Bancha | ยังเก็บไม่ได้: `principal.external_id` มีอยู่แต่ API ของ Arak ไม่ให้ตั้ง จึงผูกด้วย email | custom property `banchaId` |
 | `username` | Directory | `principal.username` | `user.name` |
 | `email` | Directory | `principal.email` | `user.email` |
 | `displayName` | Directory | `principal.display_name` | `user.displayName` |
-| `status` | Directory | `principal.enabled` | soft delete ของ user |
-| `department` | Directory | `principal_attribute` key `department` | ไม่ส่ง |
+| `status` | Directory | `principal.enabled` (แก้ได้เฉพาะบัญชี `local`) | soft delete ของ user |
+| `department` | Directory | `principal_attribute` key `department` (แถว `source = 'local'`) | ไม่ส่ง |
 | `employeeType` | Directory | `principal_attribute` key `employeeType` | ไม่ส่ง |
 | `country` | Directory | `principal_attribute` key `country` | ไม่ส่ง |
-| `groups` | Bancha | `principal` (type GROUP) + `group_member` เขียนด้วย `source = 'bancha'` | `user.teams` |
+| `groups` | Bancha | `principal` (type GROUP, `source = 'local'`) + `group_member` | `user.teams` |
 | `roles` | Bancha (role binding) | `app_role_assignment.app_role` + `scope_fqn` | `user.roles`, `user.isAdmin` |
 
 Directory หมายถึง Azure AD เมื่อต่อแล้ว ระหว่างนี้ค่าตั้งต้นมาจากที่แอพถืออยู่
@@ -173,6 +173,7 @@ Directory หมายถึง Azure AD เมื่อต่อแล้ว �
 2. **Role ส่งทั้ง key และค่าที่แอพใช้** Arak เก็บ `PLATFORM_ADMIN`, `DATA_OWNER`, `REQUESTER`, `AUDITOR` manifest ประกาศ `appValue` ให้แต่ละ role แล้ว event ส่ง `{ "role": "data-owner", "appValue": "DATA_OWNER", "scope": "<fqn>" }` แอพไม่ต้องมี mapping table
 3. **Role มี scope ได้** `DATA_OWNER` ผูกกับ FQN ของ OpenMetadata role ที่ manifest ตั้ง `scoped: true` จะมี `scope` ใน role binding
 4. **ส่งเฉพาะที่ manifest ขอ** OpenMetadata ขอแค่ `username`, `email`, `displayName` จึงไม่ได้ department หรือ country
+5. **Arak ไม่มี source `bancha`** CHECK constraint ของ `principal.source` รับแค่ `entra`, `openmetadata`, `local` ของที่ Bancha สร้างจึงเป็น `local` และแยกออกได้จาก audit (actor `bancha-sync`) ดู §3.6
 
 **Mapping ของ role Arak**
 
@@ -182,6 +183,34 @@ Directory หมายถึง Azure AD เมื่อต่อแล้ว �
 | `arak.data-owner` | `DATA_OWNER` | scoped ด้วย `scope_fqn` |
 | `arak.requester` | `REQUESTER` | default |
 | `arak.auditor` | `AUDITOR` | |
+
+### 3.6 Bancha push เข้า Arak อย่างไร (ทดสอบบน prod แล้ว 14 Oct 2026)
+
+Arak ไม่ต้องแก้โค้ด Bancha เป็น **adapter** ที่เรียก admin API ของ Arak เอง (`server/arak-push.js`) แต่ละแอพยังเก็บข้อมูลในตารางของตัวเอง Bancha แค่ทำให้ค่าตรงกับส่วนกลาง
+
+- **บัญชี** Bancha login เป็น `bancha-sync` (local SERVICE, `PLATFORM_ADMIN`) สร้างด้วย `server/arak-sync-account.js` รหัสสุ่มเก็บใน `.env` ของ Bancha (mode 600) audit ของ Arak จึงบอกได้ว่า Bancha เป็นคนแก้
+- **ใช้งาน** `node server/arak-push.js <desired.json> [--plan|--apply|--undo]` ค่า default คือ `--plan` พิมพ์สิ่งที่จะทำโดยไม่แก้อะไร รันซ้ำได้ ถ้าค่าตรงแล้วจะได้ "Arak already matches"
+- **User** หาด้วย email ก่อน แล้วค่อย username ของ `local` ถ้าไม่มีจะสร้าง USER แบบไม่มีรหัส (login ด้วย Microsoft เท่านั้น) ให้ role ที่ขาด และแทนที่ attribute `department`, `employeeType`, `country` เฉพาะแถว `local` บัญชี `entra` แก้ได้แค่ role และ attribute
+- **Group** สร้างเป็น GROUP `local` แล้วเพิ่ม member
+- **Connection** ส่งเฉพาะตัวที่ `grants.arak` มี โดยแบ่งเจ้าของ field ดังนี้
+
+| Field | เจ้าของ |
+|---|---|
+| engine, host, port, database, login (username/password) | Bancha |
+| enforcement mode, secure schema/pattern, table scope, `omServiceFqn`, enabled | Arak |
+
+  source ใหม่ถูกสร้างแบบ **disabled และ enforcement `NONE`** ให้ admin ของ Arak เปิดเอง login ถูก seal เป็น `fernet:` ใน Arak และส่งตอนสร้างเท่านั้น ตอนอัปเดตส่ง `fernet:stored` เพื่อเก็บค่าเดิม
+  OpenMetadata: Bancha ตั้ง `baseUrl` ส่วน JWT ของ bot ยังมาจาก env `OM_JWT_TOKEN` ของ Arak เพราะ Bancha ถือแค่ password login
+- **Undo** `--undo` ถอน role, ลบ attribute ที่ Bancha ใส่, เอาออกจาก group, ปิดบัญชี และลบ source ที่ Bancha สร้าง (เฉพาะที่ disabled และไม่มี asset)
+
+**ข้อจำกัดตอนนี้**
+
+1. API ลบ principal ไม่ได้ จึงทำได้แค่ปิด (`enabled = false`)
+2. ตั้ง `external_id` ผ่าน API ไม่ได้ ผูกด้วย email ไปก่อน
+3. Role ที่เปลี่ยนมีผลตอน user login ครั้งถัดไป
+4. Admin ของ Arak ยังแก้ค่าที่ Bancha ส่งไปใน UI ได้ Bancha จะเขียนทับรอบถัดไป ถ้าจะล็อก ("Managed by Bancha") ต้องให้ทีม Arak เพิ่ม source หรือ flag
+
+**ผลทดสอบบน prod** สร้าง `bancha-test` (REQUESTER + DATA_OWNER), `bancha-test-group`, source `bancha-test-pg` (connect test ถึง PostgreSQL 16.15) ตรวจใน arakdb แบบ read-only แล้วตรง และ `arak-live-pg` ไม่ถูกแตะ ไฟล์ทดสอบคือ `server/arak-push.test.json`
 
 ---
 
@@ -523,9 +552,9 @@ POST /bancha/events
 | ขั้น | Bancha ทำ | แอพทำ | ถ้าต้องถอย |
 |---|---|---|---|
 | 0 · Shadow (ทำแล้ว) | อ่าน user ของแต่ละแอพแบบ read-only, จับคู่ด้วย email, แสดงพรีวิว event ที่จะส่ง | ไม่ต้องทำอะไร | ไม่มีอะไรให้ถอย |
-| 1 · Link | ส่ง snapshot | เก็บ Bancha id ลงบัญชีที่ email ตรง (Arak: `principal.external_id`) ไม่แก้ field อื่น | ล้าง id ออก |
-| 2 · Upsert | ส่ง event จริง | upsert เฉพาะ field ใน §3.5 และเฉพาะแถวที่ link แล้วหรือ `source = 'bancha'` แถว `local` ที่ยังไม่ link ไม่แตะ | ปิด subscription แอพยังใช้ข้อมูลเดิมได้ |
-| 3 · Cut over | เป็นเจ้าของ field ใน §3.5 | ปิดการแก้ field เหล่านั้นใน UI ของแอพ (แสดง "Managed by Bancha") | เปิดการแก้ในแอพกลับ |
+| 1 · Link | จับคู่บัญชีด้วย email | Arak: ยังไม่ต้องทำ (API ตั้ง `external_id` ไม่ได้ จึงใช้ email เป็น key) | ไม่มีอะไรให้ถอย |
+| 2 · Upsert (Arak ทำได้แล้ว §3.6) | push ผ่าน admin API ของ Arak ด้วย `bancha-sync` | ไม่ต้องแก้โค้ด ของที่สร้างเป็นแถว `local` | หยุด push หรือรัน `--undo` แอพยังใช้ข้อมูลเดิมได้ |
+| 3 · Cut over | เป็นเจ้าของ field ใน §3.5 | ปิดการแก้ field เหล่านั้นใน UI ของแอพ (แสดง "Managed by Bancha") Arak ต้องเพิ่ม source หรือ flag ก่อน | เปิดการแก้ในแอพกลับ |
 
 ลำดับเดิม:
 

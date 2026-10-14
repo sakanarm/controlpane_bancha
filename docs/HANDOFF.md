@@ -46,6 +46,9 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 ControlPane_Bancha/
 ├─ prototype/control-plane.html   UI ทั้งหมด (HTML + CSS + JS ไฟล์เดียว ไม่มี build)
 ├─ server/server.js               Node server: เสิร์ฟ UI + API test connection จริง
+├─ server/arak-push.js            push user, group, role, connection เข้า Arak ผ่าน admin API (--plan/--apply/--undo)
+├─ server/arak-push.test.json     ชุดทดสอบ bancha-test* ที่ลองบน prod แล้ว
+├─ server/arak-sync-account.js    สร้างบัญชี bancha-sync ใน Arak และเขียน login ลง .env
 ├─ config/connections.json        รายการ connection (ไม่มี secret มีแค่ชื่อ env var)
 ├─ deploy/start.sh                entry point ของ pm2 (แบบเดียวกับ Arak)
 ├─ .env.example                   รายชื่อ env var ทั้งหมด (คัดลอกเป็น .env)
@@ -139,6 +142,21 @@ cd ~/ControlPane_Bancha && git pull origin main && pm2 restart bancha
 
 `start.sh` จะรัน `npm ci` ให้เองเมื่อ `package-lock.json` เปลี่ยน
 
+### Push เข้า Arak (ARCHITECTURE §3.6)
+
+บัญชี `bancha-sync` สร้างแล้วบน prod และ login อยู่ใน `.env` ของ Bancha (`ARAK_URL`, `ARAK_USER`, `ARAK_PASSWORD`) ไม่ต้องใช้รหัส admin อีก
+
+```bash
+cd ~/ControlPane_Bancha && set -a && . ./.env && set +a
+node server/arak-push.js server/arak-push.test.json            # --plan: พิมพ์สิ่งที่จะทำ ไม่แก้อะไร
+node server/arak-push.js server/arak-push.test.json --apply
+node server/arak-push.js server/arak-push.test.json --undo     # ถอนของที่ไฟล์นี้ใส่
+```
+
+ถ้าต้องสร้าง `bancha-sync` ใหม่ (Arak ตัวอื่น หรือเปลี่ยนรหัส) ส่งรหัส admin ทาง stdin ไม่ต้องเขียนลงไฟล์:
+`printf '%s
+' '<admin password>' | ARAK_ADMIN_USER=admin node server/arak-sync-account.js [--rotate]`
+
 ### nginx `/Bancha` (ต้องให้เจ้าของ server ทำ เพราะต้องใช้ sudo และเป็นไฟล์ที่แชร์กัน)
 
 ตัวอย่าง location ที่จะขอให้เพิ่ม:
@@ -163,6 +181,7 @@ UI เรียก API ด้วย relative path (`api/...`) จึงทำง
 
 1. **ห้ามแก้ของคนอื่น** ทั้งระบบจริงและโฟลเดอร์ของแอพอื่นบน prod ให้ทำงานเฉพาะใน `~/ControlPane_Bancha` อ่านดูวิธีของคนอื่นได้ แต่ห้ามแก้
 2. ทุกการต่อไประบบจริงต้อง **read-only** (Postgres ใช้ read-only session และ HTTP ใช้แค่ GET ยกเว้น login ที่ต้องใช้ขอ token)
+   ข้อยกเว้นเดียว: push เข้า Arak ผ่าน admin API ของ Arak ด้วยบัญชี `bancha-sync` (เจ้าของงานอนุมัติ 14 Oct 2026) ห้ามแตะ source `arak-live-pg` และห้ามเขียน arakdb ตรง
 3. **Secret อยู่ใน `.env` เท่านั้น** ห้าม commit ห้ามเขียนลงไฟล์อื่นหรือ log (server ปิดค่า `password=` ใน error message ไว้แล้ว) ห้ามเปิดอ่าน `.env` ของแอพอื่น
 4. ดูบน local ให้เจ้าของงานเห็นก่อน แล้วค่อย push และ deploy โดย **ต้องถามก่อนทุกครั้ง**
 5. nginx และ config ที่ใช้ร่วมกันต้องให้เจ้าของ server อนุมัติ
@@ -177,6 +196,7 @@ UI เรียก API ด้วย relative path (`api/...`) จึงทำง
 
 ## 8. ความเสี่ยงที่ควรรู้
 
-- Credential หลายตัว (OM, arakdb, Arak admin, SSH) ถูกส่งผ่านแชทระหว่างพัฒนา **ควร rotate**
+- Credential หลายตัว (OM, arakdb, Arak admin, SSH) ถูกส่งผ่านแชทระหว่างพัฒนา **ควร rotate** Bancha ไม่ใช้รหัส `admin` ของ Arak แล้ว เปลี่ยนได้เลย
+- บน Arak prod ยังมีของทดสอบ `bancha-test`, `bancha-test-group`, source `bancha-test-pg` (disabled) ลบได้ด้วย `node server/arak-push.js server/arak-push.test.json --undo`
 - ตอนนี้ Bancha ใช้ user ของแอพอื่น (`arak` และ account OM ส่วนตัว) ควรขอ user read-only ของ Bancha เอง
 - `prototype/control-plane.html` เป็นไฟล์เดียวขนาดประมาณ 1,700 บรรทัด (รวมโลโก้ base64) เมื่อเข้า Phase 1 ควรแยกเป็น frontend project (เช่น Vite) หรืออย่างน้อยแยก JS ออกมา

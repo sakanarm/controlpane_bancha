@@ -611,7 +611,7 @@ const T0 = Date.now();
 const clock = () => { const d = new Date(Date.UTC(2026,9,13,15,12,5) + (Date.now()-T0)); return d.toISOString().slice(11,19); };
 
 const APPS = [
-  { key:'arak', name:'Arak', purpose:'Data Access Control', kind:'App', version:'2.3.0', baseUrl:'https://arak.internal', mode:'webhook', status:'active', hb:'12 s ago', applied:48213, users:1180, owner:'data-governance@example.co.th',
+  { key:'arak', name:'Arak', purpose:'Data Access Control', kind:'App', version:'2.3.0', baseUrl:'https://arak.internal', mode:'adapter', adapter:'arak-admin-api', status:'active', hb:'12 s ago', applied:48213, users:1180, owner:'data-governance@example.co.th',
     roles:[['admin','Arak Admin'],['steward','Data Steward'],['requester','Access Requester']], deps:['openmetadata'],
     subs:['user.*','group.*','rolebinding.*','connection.*','app.*','sync.*'], pub:['arak.access.granted','arak.access.revoked'], attrs:['username','email','displayName','department','manager'],
     provides:['arak:policies.read','arak:requests.write'], consumes:[] },
@@ -1114,7 +1114,7 @@ const roleText = r => r.role + (r.scope ? ' @ ' + r.scope : '');
 // Locations come from arakdb (principal, principal_attribute, group_member, app_role_assignment) and the OpenMetadata user API, read 14 Oct 2026.
 // owner: who decides the value. Directory = Azure AD once connected. Values the app owns are never sent.
 const XFIELDS = [
-  { f:'id', owner:'Bancha', arak:'principal.external_id', om:'custom property banchaId', a:x => x.external_id, note:'Link key. Empty in Arak today for every user' },
+  { f:'id', owner:'Bancha', arak:'principal.external_id', om:'custom property banchaId', a:x => x.external_id, note:'Empty in Arak: its API cannot set external_id yet, so Bancha links by email' },
   { f:'username', owner:'Directory', arak:'principal.username', om:'user.name', a:x => x.username, o:x => x.username },
   { f:'email', owner:'Directory', arak:'principal.email', om:'user.email', a:x => x.email, o:x => x.email, note:'Used to match accounts that already exist' },
   { f:'displayName', owner:'Directory', arak:'principal.display_name', om:'user.displayName', a:x => x.name, o:x => x.name },
@@ -1122,7 +1122,7 @@ const XFIELDS = [
   { f:'department', owner:'Directory', arak:"principal_attribute 'department'", om:null, a:x => x.attrs?.department },
   { f:'employeeType', owner:'Directory', arak:"principal_attribute 'employeeType'", om:null, a:x => x.attrs?.employeeType },
   { f:'country', owner:'Directory', arak:"principal_attribute 'country'", om:null, a:x => x.attrs?.country },
-  { f:'groups', owner:'Bancha', arak:"principal GROUP + group_member, source 'bancha'", om:'user.teams', a:x => x.groups.join(', '), o:x => x.teams.join(', '), cmp:false },
+  { f:'groups', owner:'Bancha', arak:"principal GROUP + group_member, source 'local'", om:'user.teams', a:x => x.groups.join(', '), o:x => x.teams.join(', '), cmp:false },
   { f:'roles', owner:'Bancha role bindings', arak:'app_role_assignment.app_role + scope_fqn', om:'user.roles, user.isAdmin', a:x => x.roles.map(roleText).join(', '), o:x => [...x.roles, x.admin ? 'isAdmin' : ''].filter(Boolean).join(', '), cmp:false },
 ];
 // Kept by the app. Bancha never sends or overwrites these.
@@ -1162,8 +1162,8 @@ function xuserDrawer(key){
     <div class="banner info" style="margin:0 0 16px">${ic('shield')}<div><b>Preview only.</b> Nothing is sent. Arak and OpenMetadata stay exactly as they are.</div></div>
     ${a && o && a.username.toLowerCase() !== o.username.toLowerCase() ? `<div class="banner warn" style="margin:0 0 16px">${ic('alert')}<div><b>Usernames differ.</b> Bancha links the two accounts by email and does not rename either one, so each app keeps its own username.</div></div>` : ''}
     <div class="sec"><h3>What each app holds today</h3><div class="box"><table><thead><tr><th>Field</th><th>Arak</th><th>OpenMetadata</th></tr></thead><tbody>${rows}</tbody></table></div></div>
-    <div class="sec"><h3>Event to Arak <span class="t-mute" style="font-weight:400">· webhook</span></h3><pre class="code">${ev(toArak)}</pre>
-      <div class="cell-sub" style="margin-top:6px">${a ? 'Arak finds this user by email and stores the Bancha id in principal.external_id.' : "Arak would add this user with source 'bancha'."} Arak keeps ${esc(XKEEP.arak)}.</div></div>
+    <div class="sec"><h3>Push to Arak <span class="t-mute" style="font-weight:400">· adapter → Arak admin API</span></h3><pre class="code">${ev(toArak)}</pre>
+      <div class="cell-sub" style="margin-top:6px">${a ? 'Bancha finds this user in Arak by email and updates roles and attributes as bancha-sync.' : "Bancha would add this user to Arak as a local account with no password (Microsoft sign-in)."} Arak keeps ${esc(XKEEP.arak)}.</div></div>
     <div class="sec"><h3>Change to OpenMetadata <span class="t-mute" style="font-weight:400">· adapter, OpenMetadata API</span></h3><pre class="code">${ev(toOm)}</pre>
       <div class="cell-sub" style="margin-top:6px">${o ? 'The adapter updates the existing user and sets custom property banchaId.' : 'The adapter would add this user to OpenMetadata.'} Arak attributes like department are not sent to OpenMetadata: its manifest asks only for username, email and displayName.</div></div>`);
 }
@@ -1357,7 +1357,7 @@ ${a.roles.map(([rk, rn]) => `    - ${k('key')}: ${rk}\n      ${k('name')}: ${esc
 ${a.key === 'arak' ? `      - { ${k('types')}: [postgresql, oracle, snowflake], ${k('profiles')}: [admin] }\n      - { ${k('types')}: [openmetadata], ${k('profiles')}: [read] }` : a.key === 'openmetadata' ? `      - { ${k('types')}: [postgresql, oracle, mssql, snowflake, databricks], ${k('profiles')}: [metadata] }` : `      - { ${k('types')}: [postgresql, oracle, mssql, snowflake, databricks, trino], ${k('profiles')}: [read] }\n      - { ${k('types')}: [openmetadata], ${k('profiles')}: [write] }`}
   ${k('events')}:
     ${k('subscribe')}: [${a.subs.join(', ')}]${a.pub.length ? `\n    ${k('publish')}: [${a.pub.join(', ')}]` : ''}
-  ${k('delivery')}: { ${k('mode')}: ${a.mode}${a.mode === 'adapter' ? ', ' + k('adapter') + ': openmetadata' : ''} }${a.deps.length ? `\n  ${k('dependsOn')}: [${a.deps.join(', ')}]` : ''}`;
+  ${k('delivery')}: { ${k('mode')}: ${a.mode}${a.mode === 'adapter' ? ', ' + k('adapter') + ': ' + (a.adapter || a.key) : ''} }${a.deps.length ? `\n  ${k('dependsOn')}: [${a.deps.join(', ')}]` : ''}`;
 }
 function eventFor(e, appKey){
   const a = app(appKey);

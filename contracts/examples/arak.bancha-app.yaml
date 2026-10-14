@@ -45,9 +45,10 @@ spec:
           - "principal_attribute: clearance, rls_department, tenant, doctype"
           - db_principal_map
           - LLM, rail and home layout settings
-      groups: true          # principal GROUP rows and group_member, written with source 'bancha'
+      groups: true          # principal GROUP rows and group_member, written as source 'local' (Arak has no 'bancha' source)
     connections:
-      - types: [postgresql, oracle, mssql, snowflake]
+      # Bancha owns engine, host, port, database and login; Arak keeps enforcement mode, secure schema, table scope and enabled.
+      - types: [postgresql, mssql, mysql]   # the engines Arak's data_source supports
         profiles: [admin]
         reason: Applies GRANT/REVOKE statements on approved requests
       - types: [openmetadata]
@@ -63,5 +64,6 @@ spec:
     subscribe: [user.*, group.*, rolebinding.*, connection.*, app.*, sync.*]
     publish: [arak.access.granted, arak.access.revoked]
   delivery:
-    mode: webhook
+    mode: adapter
+    adapter: arak-admin-api   # server/arak-push.js signs in as bancha-sync and calls /api/v1/principals and /api/v1/sources
   dependsOn: [openmetadata]

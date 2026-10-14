@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 const arakSync = require('./arak-sync');
+const auth = require('./auth');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 3950);
@@ -202,8 +203,8 @@ function view(c) {
 /* ── HTTP ── */
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
-function send(res, code, body, type = 'application/json') {
-  res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+function send(res, code, body, type = 'application/json', headers = {}) {
+  res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
@@ -213,6 +214,14 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname.replace(/^\/bancha(?=\/|$)/i, '') || '/';
     if (p === '/api/health') return send(res, 200, { ok: true });
+    if (p === '/api/session' && req.method === 'GET') return send(res, 200, { auth: auth.MODE, user: auth.current(req) });
+    if (p === '/api/login' && req.method === 'POST') { const [code, body, h] = await auth.login(req); return send(res, code, body, undefined, h); }
+    if (p === '/api/logout' && req.method === 'POST') { const [code, body, h] = auth.logout(req); return send(res, code, body, undefined, h); }
+    // Everything else under /api shows real people or acts on real systems: signed-in admins only.
+    if (p.startsWith('/api/')) {
+      if (!auth.current(req)) return send(res, 401, { error: 'sign in first' });
+      if (req.method !== 'GET' && !auth.sameOrigin(req)) return send(res, 403, { error: 'cross-site request' });
+    }
     if (p === '/api/identity' && req.method === 'GET') {
       if (!identity || url.searchParams.has('refresh')) await refreshIdentity();
       const { lists, ...out } = identity;
@@ -237,7 +246,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Bancha listening on http://${HOST}:${PORT}`);
+  console.log(`Bancha listening on http://${HOST}:${PORT}, sign-in: ${auth.MODE === 'off' ? 'OFF (every API is open)' : 'Arak PLATFORM_ADMIN'}`);
   const all = () => Promise.all(CONFIG.map(runTest)).then(refreshIdentity).catch(e => console.error('[identity]', e.message));
   all(); setInterval(all, RETEST_MS).unref();
   arakSync.start();

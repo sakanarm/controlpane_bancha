@@ -722,6 +722,9 @@ const AUDIT = [
 
 /* ───────────── State ───────────── */
 const LIVE = { on:false, at:'' };   // true once server/server.js answers with real connections
+// sample: prototype accounts, any password (file:// or server with BANCHA_AUTH=off). pending: asking the server.
+// arak: the server checks the password with Arak and only lets Arak platform admins in.
+const AUTH = { mode: location.protocol === 'file:' ? 'sample' : 'pending' };
 const IDN = { on:false, at:'', sources:{}, people:[] };   // live users of Arak and OpenMetadata, matched by email (api/identity)
 const PAGES_ORDER = ['myapps','overview','identity','connections','apps','sync'];
 const state = {
@@ -741,13 +744,15 @@ try { const s = JSON.parse(sessionStorage.getItem('bancha-session') || 'null'); 
 
 /* ───────────── Session ───────────── */
 const ADMIN_GROUP = 'DG-Platform-Admins';
-const METHOD = { azure:'Azure AD SSO', ldap:'LDAP password', local:'Local password' };
+const METHOD = { azure:'Azure AD SSO', ldap:'LDAP password', local:'Local password', arak:'Arak password' };
 const REDIRECT = { arak:'/auth/callback', prajak:'/oauth/callback', openmetadata:'/callback' };
-const me = () => state.session && USERS.find(u => u.user === state.session.user);
+const me = () => state.session && (state.session.u || USERS.find(u => u.user === state.session.user));
+// The signed-in Arak admin, shaped like a sample user so the console treats them as a Bancha admin. Not added to USERS.
+const arakUser = x => ({ ...mkU(x.displayName || x.username, x.username, 'Arak', 'Arak platform admin', [ADMIN_GROUP]), email: x.email || x.username, sync: 'Arak sign-in', oid: '—' });
 const isAdmin = u => !!u && (u.groups.includes(ADMIN_GROUP) || u.user === 'bg.admin');
 const initials = n => n.split(/[\s.-]+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
 const isDark = () => { const r = document.documentElement; return r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
-function saveSession(){ try { if (state.session) sessionStorage.setItem('bancha-session', JSON.stringify(state.session)); else sessionStorage.removeItem('bancha-session'); } catch {} }
+function saveSession(){ if (AUTH.mode === 'arak') return; try { if (state.session) sessionStorage.setItem('bancha-session', JSON.stringify(state.session)); else sessionStorage.removeItem('bancha-session'); } catch {} }
 
 /* ───────────── Derived ───────────── */
 const liveApps = () => APPS.filter(a => a.status !== 'removed');
@@ -879,12 +884,13 @@ const MS_LOGO = '<svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="tr
 function loginHTML(){
   const L = state.login, target = L.target && app(L.target);
   const sub = target ? `Continue to ${esc(target.name)}. You go straight in, already signed in.` : 'Users, connections and apps for Arak, Prajak and OpenMetadata.';
+  if (AUTH.mode === 'arak') L.mode = 'form';
   const choose = `<button class="btn-sso" data-act="sso"><span class="ms">${MS_LOGO}</span>Sign in with MFEC</button>
       <button class="btn-alt" data-act="lgmode" data-id="form">${ic('user')}Sign in with username</button>`;
-  const form = `<button class="back" data-act="lgmode" data-id="choose">${ic('arrow')}Other ways to sign in</button>
+  const form = `${AUTH.mode === 'arak' ? '' : `<button class="back" data-act="lgmode" data-id="choose">${ic('arrow')}Other ways to sign in</button>`}
       <form id="loginform" class="stack" novalidate>
-        <label class="field"><span>Username</span><input class="inp" id="lg-user" data-lg="user" value="${esc(L.user)}" autocomplete="username" placeholder="siriporn.k"></label>
-        <label class="field"><span>Password</span><input class="inp" id="lg-pass" type="password" autocomplete="current-password"><small>LDAP and local accounts. MFEC (Azure AD) accounts use “Sign in with MFEC”.</small></label>
+        <label class="field"><span>Username</span><input class="inp" id="lg-user" data-lg="user" value="${esc(L.user)}" autocomplete="username" placeholder="${AUTH.mode === 'arak' ? 'Your Arak username' : 'siriporn.k'}"></label>
+        <label class="field"><span>Password</span><input class="inp" id="lg-pass" type="password" autocomplete="current-password"><small>${AUTH.mode === 'arak' ? 'Checked by Arak. Bancha does not keep it.' : 'LDAP and local accounts. MFEC (Azure AD) accounts use “Sign in with MFEC”.'}</small></label>
         ${L.err ? `<div class="err" role="alert">${esc(L.err)}</div>` : ''}
         <button class="btn primary block" type="submit">Sign in</button>
       </form>`;
@@ -898,7 +904,8 @@ function loginHTML(){
         <p>${sub}</p>
         ${L.mode === 'form' ? form : choose}
         ${L.err && L.mode !== 'form' ? `<div class="err" role="alert" style="margin-top:16px">${esc(L.err)}</div>` : ''}
-        <div class="login-note">Prototype: any password works. Try <span class="mono">siriporn.k</span> (no admin) or <span class="mono">sakan.pu</span> (admin). MFEC sign-in shows a sample account list.</div>
+        <div class="login-note">${AUTH.mode === 'arak' ? 'Sign in with your Arak account. Until Microsoft sign-in is ready, only Arak platform admins can open Bancha, with a local Arak password.'
+          : 'Prototype: any password works. Try <span class="mono">siriporn.k</span> (no admin) or <span class="mono">sakan.pu</span> (admin). MFEC sign-in shows a sample account list.'}</div>
       </div>
     </section>
     <section class="login-side" aria-label="About Bancha">
@@ -919,7 +926,8 @@ function signIn(u, method){
   closeLayer();
   if (u.status !== 'active') { state.login.err = `${u.name}'s account is disabled. ${u.note || ''}`; render(); return; }
   const dest = state.login.target && app(state.login.target) ? state.login.target : null;
-  state.session = { user:u.user, method, at:clock().slice(0, 5) }; saveSession();
+  state.session = { user:u.user, method, at:clock().slice(0, 5), ...(method === 'arak' ? { u } : {}) }; saveSession();
+  if (method === 'arak') loadLive();
   state.login = { mode:'choose', target:null, user:'', err:'' }; state.menuOpen = false;
   AUDIT.unshift({ time:clock().slice(0, 5), actor:u.user, action:'auth.login', target: dest || 'bancha', detail:METHOD[method] });
   try { history.replaceState(null, '', location.pathname); } catch {}
@@ -947,7 +955,7 @@ function handoffHTML(){
   else {
     const steps = [
       [h.fresh ? `Signed in to Bancha with ${METHOD[s.method]}` : `Already signed in to Bancha since ${s.at}`,
-        h.fresh ? (s.method === 'azure' ? 'Password and MFA handled by Azure AD' : s.method === 'ldap' ? 'Password checked against ldaps://10.6.150.10' : 'Password checked by Bancha (break-glass account)') : 'Keycloak SSO session. No password asked again'],
+        h.fresh ? (s.method === 'azure' ? 'Password and MFA handled by Azure AD' : s.method === 'ldap' ? 'Password checked against ldaps://10.6.150.10' : s.method === 'arak' ? 'Password checked by Arak' : 'Password checked by Bancha (break-glass account)') : 'Keycloak SSO session. No password asked again'],
       [`Authorization request from client "${a.key}"`, `${a.baseUrl.replace('https://', '')} → bancha.internal/realms/bancha/…/auth`],
       ['Role check passed', `${roleName(a.key, acc.role)} via ${acc.via}`],
       ['Authorization code sent back to the app', a.baseUrl + (REDIRECT[a.key] || '/callback')],
@@ -1636,6 +1644,7 @@ const PAGES = { myapps:pMyApps, overview:pOverview, identity:pIdentity, connecti
 function render(){
   const a = document.activeElement, aid = a && a.id, pos = a && typeof a.selectionStart === 'number' ? a.selectionStart : null;
   const u = me();
+  if (AUTH.mode === 'pending') { $('#app').innerHTML = ''; return; }
   if (!u) { render.last = null; $('#app').innerHTML = loginHTML(); }
   else if (state.page === 'handoff' && state.handoff) $('#app').innerHTML = handoffHTML();
   else {
@@ -1696,6 +1705,7 @@ const ACT = {
   pickuser: d => signIn(USERS.find(u => u.user === d.id), 'azure'),
   signout: () => { const u = me(); if (u) AUDIT.unshift({ time:clock().slice(0, 5), actor:u.user, action:'auth.logout', target:'all apps', detail:'Back-channel logout sent' });
     if (hoTimer) { clearInterval(hoTimer); hoTimer = null; }
+    if (AUTH.mode === 'arak') fetch('api/logout', { method:'POST' }).catch(() => {});
     state.session = null; state.handoff = null; state.page = null; saveSession(); closeLayer(); render();
     toast('Signed out of Bancha and every app', liveApps().filter(a => a.status === 'active').map(a => a.name).join(', ') + ' received a back-channel logout'); },
   myapps: () => go('myapps'),
@@ -1822,6 +1832,12 @@ document.addEventListener('submit', e => {
     const L = state.login, id = $('#lg-user').value.trim().toLowerCase(), pw = $('#lg-pass').value; L.user = id;
     const fail = m => { L.err = m; render(); };
     if (!id || !pw) return fail('Enter your username and password.');
+    if (AUTH.mode === 'arak') {
+      const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true;
+      fetch('api/login', { method:'POST', headers:{ 'content-type':'application/json' }, body: JSON.stringify({ username:id, password:pw }) })
+        .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) return fail(d.error || 'Sign-in failed (HTTP ' + r.status + ').'); signIn(arakUser(d.user), 'arak'); })
+        .catch(() => fail('Bancha is not reachable.'));
+      return; }
     const u = USERS.find(x => x.user === id || x.email === id);
     if (!u) return fail('Username or password is incorrect.');
     if (u.src === 'Azure AD') return fail(`${u.email} is an Azure AD account. Use "Sign in with MFEC" so MFA applies.`);
@@ -1855,19 +1871,35 @@ function fromApi(x){
     dir: x.cat === 'directory' ? { filter:'—', every:'Not scheduled yet', last: t.ok ? 'Reachable · ' + t.at : '—', users:i.users || 0, groups:i.groups || 0, changed:0 } : null };
 }
 function applyLive(list){ CONNS.splice(0, CONNS.length, ...list.map(fromApi)); LIVE.on = true; LIVE.at = new Date().toTimeString().slice(0, 5); }
+// A 401 means the server session ended (expired or the server restarted): back to the sign-in page.
+async function api(url, opts){
+  const r = await fetch(url, { cache:'no-store', ...opts });
+  if (r.status === 401 && AUTH.mode === 'arak' && state.session) { state.session = null; state.page = null; state.login.err = 'Your session ended. Sign in again.'; closeLayer(); render(); }
+  return r;
+}
 async function loadLive(){
-  if (location.protocol === 'file:') return;
-  try { const r = await fetch('api/connections', { cache:'no-store' }); if (!r.ok) return;
+  if (location.protocol === 'file:' || (AUTH.mode === 'arak' && !state.session)) return;
+  try { const r = await api('api/connections'); if (!r.ok) return;
     const d = await r.json(); if (!d.live) return; applyLive(d.connections); render(); renderLayer(); loadIdentity(); } catch {}
 }
 async function loadIdentity(again){
-  try { const r = await fetch('api/identity' + (again ? '?refresh' : ''), { cache:'no-store' }); if (!r.ok) return;
+  try { const r = await api('api/identity' + (again ? '?refresh' : '')); if (!r.ok) return;
     Object.assign(IDN, await r.json(), { on:true }); render(); } catch {}
 }
 async function liveTest(id){
-  const r = await fetch(`api/connections/${encodeURIComponent(id)}/test`, { method:'POST' });
+  const r = await api(`api/connections/${encodeURIComponent(id)}/test`, { method:'POST' });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const c = fromApi(await r.json()); const i = CONNS.findIndex(x => x.id === id); if (i >= 0) CONNS[i] = c; return c;
 }
-loadLive();
+// Ask the server how sign-in works before showing anything, so a stale sample session never flashes up.
+(async () => {
+  if (AUTH.mode === 'pending') {
+    try { const r = await fetch('api/session', { cache:'no-store' }); const d = await r.json();
+      if (d.auth === 'arak') { AUTH.mode = 'arak'; state.session = d.user ? { user:d.user.username, method:'arak', at:'', u:arakUser(d.user) } : null; }
+      else AUTH.mode = 'sample';
+    } catch { AUTH.mode = 'sample'; }
+    render();
+  }
+  loadLive();
+})();
 </script>

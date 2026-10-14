@@ -56,8 +56,8 @@
 | 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ✅ | 14 Oct 2026, `BIND_HOST=0.0.0.0` เปิดที่ http://10.4.155.151:3950/ จนกว่าจะมี nginx (0.10) |
 | 0.10 | nginx location `/Bancha` | ⏳ | ไฟล์ nginx เป็นของ root และใช้ร่วมกับแอพอื่น ต้องให้เจ้าของ server อนุมัติและทำให้ (ไฟล์ตัวอย่างอยู่ใน HANDOFF) |
 | 0.11 | ให้หน้าอื่น (Overview, Users & groups, App registry, Distribution) ใช้ข้อมูลจริง | ⬜ | ตอนนี้ยังเป็น sample data ต้องรอ Phase 1 (DB) และ 0.3 (Azure AD) |
-| 0.12 | Login จริง | ⬜ | ตอนนี้เป็นการเลือก sample account ทำจริงได้หลัง 0.3 หรือใช้ auth-service `/auth/verify` (0.4) |
-| 0.13 | ปิดข้อมูลจริงจากคนที่ไม่ได้ login | ⬜ | URL บน prod ยังไม่มี login จริง ใครอยู่ใน network เห็นชื่อและอีเมลในหน้า Across apps ได้ ต้องตัดสินใจ: ปิดหน้านี้บน prod, ใส่รหัสผ่านชั่วคราว หรือรอ 0.12 |
+| 0.12 | Login จริง | 🟡 | ตอนนี้ login ด้วยบัญชี Arak (0.13) ส่วน Sign in with MFEC รอ 0.3 และ 1.6 |
+| 0.13 | ปิดข้อมูลจริงจากคนที่ไม่ได้ login | ✅ | 14 Oct 2026: ทุก `/api/*` (ยกเว้น health และ login) ต้อง login ก่อน รหัสตรวจโดย Arak (`POST /v1/auth/login`) และรับเฉพาะ `PLATFORM_ADMIN` (`server/auth.js`) ยังเป็น http ธรรมดา cookie จึงดักได้ใน network จนกว่าจะมี HTTPS (0.10) |
 
 ---
 

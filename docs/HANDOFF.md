@@ -49,6 +49,7 @@ ControlPane_Bancha/
 ├─ server/arak-push.js            push user, group, role, connection เข้า Arak ผ่าน admin API (--plan/--apply/--undo)
 ├─ server/arak-push.test.json     ชุดทดสอบ bancha-test* ที่ลองบน prod แล้ว
 ├─ server/arak-sync-account.js    สร้างบัญชี bancha-sync ใน Arak และเขียน login ลง .env
+├─ server/auth.js                 login ของคอนโซล: ตรวจรหัสกับ Arak รับเฉพาะ PLATFORM_ADMIN, session ใน memory
 ├─ server/arak-sync.js            ให้ server รัน arak-push --apply เอง (start, ไฟล์เปลี่ยน, ทุกคืน)
 ├─ config/arak.json               สิ่งที่ Bancha push เข้า Arak อัตโนมัติ (ตอนนี้แค่ connection)
 ├─ config/connections.json        รายการ connection (ไม่มี secret มีแค่ชื่อ env var)
@@ -67,6 +68,7 @@ ControlPane_Bancha/
 - Routes
   - `GET /` เสิร์ฟ `prototype/control-plane.html`
   - `GET /api/health`
+  - `GET /api/session`, `POST /api/login`, `POST /api/logout` login ด้วยบัญชี Arak (`server/auth.js`) route อื่นใต้ `/api/` ตอบ 401 ถ้ายังไม่ login และ POST จากเว็บอื่นตอบ 403
   - `GET /api/connections` ส่ง connection ทั้งหมด พร้อมผล test ล่าสุด, ข้อมูลที่เจอ และ credential ที่ยังขาด
   - `POST /api/connections/:id/test` test ทันที
   - `GET /api/arak-sync` สถานะ push อัตโนมัติเข้า Arak: เปิดอยู่ไหม, ไฟล์ที่ดู, รอบถัดไป และผลรอบล่าสุด (ไม่มี secret)
@@ -88,7 +90,7 @@ ControlPane_Bancha/
   - คลิกชื่อคนเปิด `xuserDrawer()` พรีวิว event ที่จะส่ง เป็นพรีวิวเท่านั้น ไม่ส่งอะไรออกไป
 - Prod เปิดผ่าน http ธรรมดาบน IP ไม่ใช่ secure context: ห้ามใช้ `crypto.randomUUID`, `crypto.subtle`, `navigator.clipboard` โดยไม่มี fallback (เคยทำให้หน้าขาวทั้งหน้า) หลัง deploy ให้เปิดเช็คจาก URL จริง ไม่ใช่แค่ localhost
 - Sidebar อยู่ที่ `navHTML()` และแต่ละหน้าอยู่ใน `PAGES`
-- Session เก็บใน `sessionStorage` key `bancha-session`
+- Login: ถ้าเปิดผ่าน server ที่ `BANCHA_AUTH=arak` (default) หน้า login จะส่งรหัสไป `api/login` และไม่มีปุ่ม MFEC (`AUTH.mode = 'arak'`, คนที่ login แล้วสร้างด้วย `arakUser()` ไม่ได้อยู่ใน `USERS`) ถ้าเปิดเป็น `file://` หรือ `BANCHA_AUTH=off` จะใช้ sample account แบบเดิม และ session อยู่ใน `sessionStorage` key `bancha-session`
 - Admin คือคนที่อยู่ group `DG-Platform-Admins` หรือ `bg.admin` ส่วนคนอื่นเห็นแค่ My apps
 - เปิดหน้าด้วย `?app=arak` ได้ เมื่อ login แล้วจะเด้งไปแอพนั้นเลย
 
@@ -201,6 +203,7 @@ UI เรียก API ด้วย relative path (`api/...`) จึงทำง
 
 ## 8. ความเสี่ยงที่ควรรู้
 
+- Login ของคอนโซลยังเป็น http ธรรมดา รหัสและ cookie ดักได้ใน network จนกว่าจะมี nginx + HTTPS session อยู่ใน memory restart แล้วทุกคนต้อง login ใหม่ ทนได้ 10 ครั้งที่ผิดต่อ IP ใน 15 นาที
 - Credential หลายตัว (OM, arakdb, Arak admin, SSH) ถูกส่งผ่านแชทระหว่างพัฒนา **ควร rotate** Bancha ไม่ใช้รหัส `admin` ของ Arak แล้ว เปลี่ยนได้เลย
 - บน Arak prod ยังมีของทดสอบ `bancha-test`, `bancha-test-group`, source `bancha-test-pg` (disabled) ลบได้ด้วย `node server/arak-push.js server/arak-push.test.json --undo`
 - ตอนนี้ Bancha ใช้ user ของแอพอื่น (`arak` และ account OM ส่วนตัว) ควรขอ user read-only ของ Bancha เอง

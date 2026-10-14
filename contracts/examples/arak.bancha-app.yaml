@@ -16,21 +16,36 @@ spec:
     oidc:
       redirectUris: [https://arak.internal/auth/callback]
       postLogoutRedirectUris: [https://arak.internal/]
+  # Roles as Arak stores them today in app_role_assignment.app_role (read from arakdb, 14 Oct 2026).
   roles:
-    - key: admin
-      name: Arak Admin
-      description: Manages policies and approval workflows
-    - key: steward
-      name: Data Steward
-      description: Approves access requests for owned domains
+    - key: platform-admin
+      name: Platform Admin
+      description: Manages policies, approval workflows and Arak settings
+      appValue: PLATFORM_ADMIN
+    - key: data-owner
+      name: Data Owner
+      description: Approves access requests for the data it owns
+      appValue: DATA_OWNER
+      scoped: true          # bound to an OpenMetadata FQN, stored in app_role_assignment.scope_fqn
     - key: requester
       name: Access Requester
+      appValue: REQUESTER
       default: true
+    - key: auditor
+      name: Auditor
+      description: Reads requests, grants and the audit trail
+      appValue: AUDITOR
   requires:
     identity:
       users:
-        attributes: [username, email, displayName, department, manager]
-      groups: true
+        # Stored as principal columns, or as principal_attribute rows for department, employeeType and country.
+        attributes: [username, email, displayName, department, employeeType, country]
+        match: email        # links existing principal rows; Arak keeps its own username
+        keeps:              # policy data Arak decides itself; Bancha never sends or overwrites it
+          - "principal_attribute: clearance, rls_department, tenant, doctype"
+          - db_principal_map
+          - LLM, rail and home layout settings
+      groups: true          # principal GROUP rows and group_member, written with source 'bancha'
     connections:
       - types: [postgresql, oracle, mssql, snowflake]
         profiles: [admin]

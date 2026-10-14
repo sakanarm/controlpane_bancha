@@ -64,6 +64,7 @@ ControlPane_Bancha/
   - `GET /api/health`
   - `GET /api/connections` ส่ง connection ทั้งหมด พร้อมผล test ล่าสุด, ข้อมูลที่เจอ และ credential ที่ยังขาด
   - `POST /api/connections/:id/test` test ทันที
+  - `GET /api/identity` user ของ Arak (`principal` พร้อม attribute, group และ role ที่มี scope) และ OpenMetadata (users API) จับคู่ด้วย email อ่านซ้ำทุก 5 นาทีหลัง test connection ใส่ `?refresh` เพื่ออ่านทันที ถ้าอ่านแอพไหนไม่ได้จะใช้รายชื่อล่าสุดที่อ่านได้ **มีชื่อและอีเมลจริง**
   - ตัด prefix `/bancha` ออกได้ (case-insensitive) เพื่อรองรับการวางหลัง nginx ที่ `/Bancha/`
 - Connector แต่ละประเภท **อ่านอย่างเดียว**
   - PostgreSQL: เปิด session ด้วย `default_transaction_read_only=on` แล้วอ่าน version, size และจำนวน table ต่อ schema
@@ -76,6 +77,10 @@ ControlPane_Bancha/
 
 - Sample data อยู่ใน array `USERS`, `GROUPS`, `CONNS`, `APPS` ช่วงต้นของ `<script>`
 - ถ้าเปิดผ่าน server (ไม่ใช่ `file://`) จะเรียก `loadLive()` ดึง `api/connections` แล้วแทนที่ `CONNS` ด้วยข้อมูลจริง (`LIVE.on = true` และมุมขวาบนขึ้น "Live · real connections")
+- `loadIdentity()` ดึง `api/identity` แล้วเปิดแท็บ **Across apps** ใน Users & groups (`matchView()`)
+  - ตาราง field mapping อยู่ใน `XFIELDS`, ของที่แอพเก็บเองใน `XKEEP`, role ของ Arak ใน `XROLES` ต้องตรงกับ ARCHITECTURE §3.5 และ manifest ใน `contracts/`
+  - คลิกชื่อคนเปิด `xuserDrawer()` พรีวิว event ที่จะส่ง เป็นพรีวิวเท่านั้น ไม่ส่งอะไรออกไป
+- Prod เปิดผ่าน http ธรรมดาบน IP ไม่ใช่ secure context: ห้ามใช้ `crypto.randomUUID`, `crypto.subtle`, `navigator.clipboard` โดยไม่มี fallback (เคยทำให้หน้าขาวทั้งหน้า) หลัง deploy ให้เปิดเช็คจาก URL จริง ไม่ใช่แค่ localhost
 - Sidebar อยู่ที่ `navHTML()` และแต่ละหน้าอยู่ใน `PAGES`
 - Session เก็บใน `sessionStorage` key `bancha-session`
 - Admin คือคนที่อยู่ group `DG-Platform-Admins` หรือ `bg.admin` ส่วนคนอื่นเห็นแค่ My apps
@@ -150,7 +155,7 @@ location /Bancha/ {
 
 UI เรียก API ด้วย relative path (`api/...`) จึงทำงานได้ทั้งที่ root และใต้ `/Bancha/`
 
-ระหว่างรอ ให้เข้าผ่าน SSH tunnel ได้: `ssh -L 3950:127.0.0.1:3950 appadm@10.4.155.151` แล้วเปิด http://127.0.0.1:3950/
+ระหว่างรอ เข้าได้ตรงที่ http://10.4.155.151:3950/ (`BIND_HOST=0.0.0.0`) ยังไม่มี login จริง ใครอยู่ใน network เดียวกันเปิดได้ (ROADMAP 0.13)
 
 ---
 

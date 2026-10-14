@@ -23,6 +23,7 @@
 
 - ✅ Architecture และการตัดสินใจหลัก D1–D7 (`docs/ARCHITECTURE.md`)
 - ✅ Bancha App Contract v1: JSON Schema + manifest ตัวอย่างของ Arak, Prajak, OpenMetadata (`contracts/`)
+  - 14 Oct 2026: role มี `appValue` และ `scoped`, user มี `match` และ `keeps`, manifest ของ Arak ใช้ role และ attribute จริงจาก arakdb
 - ✅ Database schema ร่าง (`db/schema.sql`) ยังไม่ได้ใช้จริง
 - ✅ Prototype UI หน้าตาแบบ Arak, sidebar สี navy, มีโลโก้แอพ (`prototype/control-plane.html`)
   - หน้า Login แบบเดียวกับ Arak: Sign in with MFEC หรือ username/password
@@ -33,7 +34,9 @@
   - **arakdb**: PostgreSQL 16.15 ที่ 10.4.155.151 มี 77 tables ใน 3 schemas
   - **OpenMetadata**: v2.0.1 ที่ 10.6.150.110:8585 มี 13 users, 13 teams, 114 tables
 - ✅ หน้า Connections แสดงผลจริงและบอกว่ายังขาด credential ตัวไหน
-- ✅ `deploy/start.sh` สำหรับ pm2 แบบเดียวกับ Arak (ยังไม่ได้ deploy)
+- ✅ `deploy/start.sh` สำหรับ pm2 แบบเดียวกับ Arak
+- ✅ **Identity → Across apps** (14 Oct 2026): อ่าน user จาก Arak (45) และ OpenMetadata (13) แบบ read-only จับคู่ด้วย email ได้ 57 คน ตรงกันทั้งสองแอพ 1 คน
+  - ตาราง "What Bancha sends to each app" และพรีวิว event รายคน ยังไม่ส่งอะไรจริง (ARCHITECTURE §3.5 และ §12 ขั้น 0)
 
 ### ต้องทำต่อ
 
@@ -47,10 +50,11 @@
 | 0.6 | LDAP (ถ้ามี) | ⏳ | host, base DN, bind user |
 | 0.7 | เปลี่ยน OpenMetadata ไปใช้ **bot account** แทน account ส่วนตัว | ⏳ | bot token จาก OM (Settings → Bots) |
 | 0.8 | ขึ้น Git: https://github.com/sakanarm/controlpane_bancha | ✅ | branch `main` |
-| 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ✅ | 14 Oct 2026, bind 127.0.0.1 เข้าผ่าน SSH tunnel จนกว่าจะมี nginx (0.10) |
+| 0.9 | Deploy prod `appadm@10.4.155.151:~/ControlPane_Bancha` ด้วย pm2 ชื่อ `bancha` port 3950 | ✅ | 14 Oct 2026, `BIND_HOST=0.0.0.0` เปิดที่ http://10.4.155.151:3950/ จนกว่าจะมี nginx (0.10) |
 | 0.10 | nginx location `/Bancha` | ⏳ | ไฟล์ nginx เป็นของ root และใช้ร่วมกับแอพอื่น ต้องให้เจ้าของ server อนุมัติและทำให้ (ไฟล์ตัวอย่างอยู่ใน HANDOFF) |
 | 0.11 | ให้หน้าอื่น (Overview, Users & groups, App registry, Distribution) ใช้ข้อมูลจริง | ⬜ | ตอนนี้ยังเป็น sample data ต้องรอ Phase 1 (DB) และ 0.3 (Azure AD) |
 | 0.12 | Login จริง | ⬜ | ตอนนี้เป็นการเลือก sample account ทำจริงได้หลัง 0.3 หรือใช้ auth-service `/auth/verify` (0.4) |
+| 0.13 | ปิดข้อมูลจริงจากคนที่ไม่ได้ login | ⬜ | URL บน prod ยังไม่มี login จริง ใครอยู่ใน network เห็นชื่อและอีเมลในหน้า Across apps ได้ ต้องตัดสินใจ: ปิดหน้านี้บน prod, ใส่รหัสผ่านชั่วคราว หรือรอ 0.12 |
 
 ---
 
@@ -68,7 +72,7 @@
 | 1.6 | Login จริงด้วย Entra OIDC (Authorization Code + PKCE) และ session cookie กำหนด admin จาก group ใน Azure AD | 0.3 |
 | 1.7 | App registry: register ด้วย manifest + validate กับ JSON Schema และ health check `/.well-known/bancha/health` | 1.2 |
 | 1.8 | Outbox `change_log` + webhook (CloudEvents, HMAC) + `GET /feed?after=seq` + snapshot | 1.2 |
-| 1.9 | Arak integration: endpoint รับ event, เพิ่ม `bancha_id`, matching report ด้วย email | 1.8 และต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
+| 1.9 | Arak integration ตาม ARCHITECTURE §12 ขั้น 1–3: link ด้วย email เก็บ Bancha id ใน `principal.external_id`, upsert เฉพาะ field ใน §3.5, แถว `local` ที่ยังไม่ link ไม่แตะ | 1.8 และต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
 | 1.10 | Audit log ทุกการแก้ไข | 1.2 |
 
 ผลลัพธ์ที่ใช้ตัดสินว่าจบ Phase 1: เพิ่ม user เข้า group ใน Bancha แล้ว Arak เห็นภายใน 1 นาที และ connection ที่ Arak ใช้ถูกจัดการจาก Bancha

@@ -67,7 +67,9 @@
               "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
               "name": { "type": "string" },
               "description": { "type": "string" },
-              "default": { "type": "boolean", "description": "Granted to every synced user that has no other role in this app." }
+              "default": { "type": "boolean", "description": "Granted to every synced user that has no other role in this app." },
+              "appValue": { "type": "string", "maxLength": 80, "description": "Value the app already stores for this role, e.g. PLATFORM_ADMIN. Sent next to key so the app needs no mapping table. Defaults to key." },
+              "scoped": { "type": "boolean", "default": false, "description": "Bindings to this role carry a scope (an OpenMetadata FQN such as a database or schema) and the app limits the role to it." }
             }
           }
         },
@@ -86,7 +88,17 @@
                     "attributes": {
                       "type": "array",
                       "uniqueItems": true,
-                      "items": { "enum": ["username", "email", "displayName", "givenName", "familyName", "department", "jobTitle", "manager", "employeeId", "phone"] }
+                      "items": { "enum": ["username", "email", "displayName", "givenName", "familyName", "department", "jobTitle", "manager", "employeeId", "phone", "employeeType", "country"] }
+                    },
+                    "match": {
+                      "enum": ["email", "username"],
+                      "default": "email",
+                      "description": "How Bancha links a user to an account the app already has. The app stores the Bancha id on the match and keeps its own username."
+                    },
+                    "keeps": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Data the app owns for a user (e.g. policy attributes). Bancha never sends or overwrites it. Shown to the admin on the approval screen."
                     }
                   }
                 },

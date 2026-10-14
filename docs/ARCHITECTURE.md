@@ -119,9 +119,9 @@ App ──< AppRole ──< RoleBinding >─────┘   (subject = group �
 ```
 
 - **User / Group** มี `source_directory_id` และ `external_id` (objectId ของ Azure AD หรือ DN ของ LDAP) แก้ได้เฉพาะ attribute ที่ directory ไม่ได้เป็นเจ้าของ
-- **AppRole** มาจาก manifest ของแต่ละแอพ (เช่น `arak.steward`) Bancha ไม่ต้องรู้ว่า role นั้นแปลว่าอะไรในแอพ
+- **AppRole** มาจาก manifest ของแต่ละแอพ (เช่น `arak.data-owner`) Bancha ไม่ต้องรู้ว่า role นั้นแปลว่าอะไรในแอพ
 - **RoleBinding** = (app, role, subject) แนะนำให้ bind ที่ **group** เป็นหลัก แล้วให้ user ได้สิทธิ์ผ่าน membership
-- สิทธิ์ละเอียดระดับ data (เช่น policy ของ Arak ว่าใครเห็น column ไหน) **ยังอยู่ใน Arak** Bancha ส่งไปแค่ "ใครคือ steward"
+- สิทธิ์ละเอียดระดับ data (เช่น policy ของ Arak ว่าใครเห็น column ไหน) **ยังอยู่ใน Arak** Bancha ส่งไปแค่ "ใครคือ data owner ของอะไร"
 
 ### 3.2 Directory sync
 
@@ -136,12 +136,52 @@ User ที่หายจาก directory จะถูก **disable ก่อ�
 ### 3.3 SSO
 
 - ทุกแอพ register เป็น OIDC client ของ Keycloak โดยอัตโนมัติตอน register (redirect URIs มาจาก manifest)
-- Token มี claims: `sub` (= Bancha user id), `email`, `groups`, `bancha_roles: {"arak": ["steward"], "prajak": ["viewer"]}`
+- Token มี claims: `sub` (= Bancha user id), `email`, `groups`, `bancha_roles: {"arak": ["data-owner"], "prajak": ["viewer"]}`
 - แอพเช็คสิทธิ์จาก token ได้ทันที ส่วน projection ใน DB แอพมีไว้ทำ lookup และ report (เช่น dropdown เลือก owner)
 
 ### 3.4 ส่งข้อมูลส่วนบุคคลเท่าที่จำเป็น (PDPA)
 
 Manifest ประกาศ attribute ที่แอพต้องใช้ (`requires.identity.users.attributes`) แล้ว Bancha **ตัด field อื่นทิ้ง** ก่อนส่ง และกรองเฉพาะ user ใน group ที่อนุมัติให้แอพนั้น ทุก field ที่ส่งออกไปมี audit ว่าส่งให้แอพไหน
+
+### 3.5 ค่าที่ Bancha ส่งให้แต่ละแอพ
+
+ตารางนี้ map จากของจริง: อ่าน arakdb (`principal`, `principal_attribute`, `group_member`, `app_role_assignment`) และ OpenMetadata users API แบบ read-only เมื่อ 14 Oct 2026 ดูของจริงรายคนได้ที่ Identity → Across apps ในคอนโซล
+
+| Field กลาง | ใครกำหนด | Arak เก็บที่ | OpenMetadata เก็บที่ |
+|---|---|---|---|
+| `id` | Bancha | `principal.external_id` (ตอนนี้ว่างทุกคน) | custom property `banchaId` |
+| `username` | Directory | `principal.username` | `user.name` |
+| `email` | Directory | `principal.email` | `user.email` |
+| `displayName` | Directory | `principal.display_name` | `user.displayName` |
+| `status` | Directory | `principal.enabled` | soft delete ของ user |
+| `department` | Directory | `principal_attribute` key `department` | ไม่ส่ง |
+| `employeeType` | Directory | `principal_attribute` key `employeeType` | ไม่ส่ง |
+| `country` | Directory | `principal_attribute` key `country` | ไม่ส่ง |
+| `groups` | Bancha | `principal` (type GROUP) + `group_member` เขียนด้วย `source = 'bancha'` | `user.teams` |
+| `roles` | Bancha (role binding) | `app_role_assignment.app_role` + `scope_fqn` | `user.roles`, `user.isAdmin` |
+
+Directory หมายถึง Azure AD เมื่อต่อแล้ว ระหว่างนี้ค่าตั้งต้นมาจากที่แอพถืออยู่
+
+**แอพเก็บเอง Bancha ไม่ส่งและไม่เขียนทับ** (ประกาศใน `requires.identity.users.keeps`)
+
+- Arak: `clearance`, `rls_department`, `tenant`, `doctype` ใน `principal_attribute` (เป็น policy ของ Arak), `db_principal_map`, ค่า LLM, rail และ home layout
+- OpenMetadata: ownership ของ asset, followers, personas, bot account
+
+**กติกาที่ได้จากข้อมูลจริง**
+
+1. **ผูกด้วย email ไม่เปลี่ยน username** คนเดียวกัน Arak ใช้ username เป็นอีเมล ส่วน OpenMetadata ใช้ชื่อสั้น ถ้าส่ง username กลางค่าเดียวจะเปลี่ยนชื่อบัญชีเดิม Bancha จึงหา account เดิมด้วย `match: email` เก็บ Bancha id ไว้ และส่ง username ที่แอพนั้นใช้อยู่ ส่วน user ใหม่ใช้ username กลาง
+2. **Role ส่งทั้ง key และค่าที่แอพใช้** Arak เก็บ `PLATFORM_ADMIN`, `DATA_OWNER`, `REQUESTER`, `AUDITOR` manifest ประกาศ `appValue` ให้แต่ละ role แล้ว event ส่ง `{ "role": "data-owner", "appValue": "DATA_OWNER", "scope": "<fqn>" }` แอพไม่ต้องมี mapping table
+3. **Role มี scope ได้** `DATA_OWNER` ผูกกับ FQN ของ OpenMetadata role ที่ manifest ตั้ง `scoped: true` จะมี `scope` ใน role binding
+4. **ส่งเฉพาะที่ manifest ขอ** OpenMetadata ขอแค่ `username`, `email`, `displayName` จึงไม่ได้ department หรือ country
+
+**Mapping ของ role Arak**
+
+| Bancha role | Arak `app_role` | หมายเหตุ |
+|---|---|---|
+| `arak.platform-admin` | `PLATFORM_ADMIN` | |
+| `arak.data-owner` | `DATA_OWNER` | scoped ด้วย `scope_fqn` |
+| `arak.requester` | `REQUESTER` | default |
+| `arak.auditor` | `AUDITOR` | |
 
 ---
 
@@ -334,7 +374,9 @@ Bancha-Signature: t=1760368222,v1=5b0c3e...   # HMAC-SHA256(webhook_secret, t + 
     "department": "Data Governance",
     "status": "active",
     "groups": ["g_dg_stewards", "g_finance_analysts"],
-    "roles": ["steward"]
+    "roles": [
+      { "role": "data-owner", "appValue": "DATA_OWNER", "scope": "arakdb.public.orders" }
+    ]
   }
 }
 ```
@@ -476,6 +518,17 @@ POST /bancha/events
 
 ## 12. Migration ของแอพที่มีอยู่ (Arak, Prajak)
 
+หลักคือ **ไม่ทำให้แอพที่ใช้อยู่พัง** ทุกขั้นถอยกลับได้ และแอพเป็นคนเลือกว่าจะเริ่มรับเมื่อไร
+
+| ขั้น | Bancha ทำ | แอพทำ | ถ้าต้องถอย |
+|---|---|---|---|
+| 0 · Shadow (ทำแล้ว) | อ่าน user ของแต่ละแอพแบบ read-only, จับคู่ด้วย email, แสดงพรีวิว event ที่จะส่ง | ไม่ต้องทำอะไร | ไม่มีอะไรให้ถอย |
+| 1 · Link | ส่ง snapshot | เก็บ Bancha id ลงบัญชีที่ email ตรง (Arak: `principal.external_id`) ไม่แก้ field อื่น | ล้าง id ออก |
+| 2 · Upsert | ส่ง event จริง | upsert เฉพาะ field ใน §3.5 และเฉพาะแถวที่ link แล้วหรือ `source = 'bancha'` แถว `local` ที่ยังไม่ link ไม่แตะ | ปิด subscription แอพยังใช้ข้อมูลเดิมได้ |
+| 3 · Cut over | เป็นเจ้าของ field ใน §3.5 | ปิดการแก้ field เหล่านั้นใน UI ของแอพ (แสดง "Managed by Bancha") | เปิดการแก้ในแอพกลับ |
+
+ลำดับเดิม:
+
 1. เพิ่มคอลัมน์ `bancha_id` ใน user และ group table ของแอพ
 2. Bancha import user จาก Azure AD แล้วรัน **matching report** โดย map ด้วย email แสดง user ที่ match ไม่ได้ให้ admin จัดการ
 3. แอพ register แล้วรับ snapshot มาเติม `bancha_id`
@@ -502,3 +555,6 @@ POST /bancha/events
 3. Environment (Dev/UAT/Prod) แยกเป็น **Bancha คนละ instance** (แนะนำ) หรือ instance เดียวที่มี field `environment`
 4. Arak และ Prajak เขียนด้วยภาษาอะไร จะได้เลือกทำ SDK ภาษานั้นก่อน
 5. Likit คือแอพอะไร ต้องใช้ resource ประเภทใดจาก Bancha
+6. `clearance` และ `rls_department` ของ Arak ควรมาจากส่วนกลาง (Bancha หรือ Azure AD) ไหม หรือเป็น policy ที่ Arak ตัดสินเองต่อไป (ตอนนี้ออกแบบให้ Arak เก็บเอง)
+7. User ส่วนใหญ่ใน Arak ตอนนี้เป็นบัญชี demo (`@example.test`) จะ link หรือปล่อยเป็น `local` แล้วค่อยลบ
+8. OpenMetadata ใช้ role อะไรเป็นค่า default ของ user ที่ Bancha สร้าง และ `isAdmin` ควรมาจาก role binding ไหน

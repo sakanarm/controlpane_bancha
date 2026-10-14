@@ -24,7 +24,9 @@ spec:
     identity:
       users:
         attributes: [username, email, displayName]
-      groups: true
+        match: email        # links existing users; the adapter sets custom property banchaId and keeps user.name
+        keeps: [asset ownership, followers, personas, bot accounts]
+      groups: true          # teams
     connections:
       - types: [postgresql, oracle, mssql, snowflake, databricks, trino, bigquery, hive]
         profiles: [metadata]

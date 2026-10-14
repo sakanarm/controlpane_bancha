@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+const arakSync = require('./arak-sync');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 3950);
@@ -217,6 +218,7 @@ const server = http.createServer(async (req, res) => {
       const { lists, ...out } = identity;
       return send(res, 200, out);
     }
+    if (p === '/api/arak-sync' && req.method === 'GET') return send(res, 200, arakSync.status());
     if (p === '/api/connections' && req.method === 'GET') return send(res, 200, { live: true, connections: CONFIG.map(view) });
     const m = p.match(/^\/api\/connections\/([\w-]+)\/test$/);
     if (m && req.method === 'POST') {
@@ -238,4 +240,5 @@ server.listen(PORT, HOST, () => {
   console.log(`Bancha listening on http://${HOST}:${PORT}`);
   const all = () => Promise.all(CONFIG.map(runTest)).then(refreshIdentity).catch(e => console.error('[identity]', e.message));
   all(); setInterval(all, RETEST_MS).unref();
+  arakSync.start();
 });

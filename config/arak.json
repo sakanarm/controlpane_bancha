@@ -1,0 +1,6 @@
+{
+  "reason": "Bancha central config (auto push)",
+  "connectionsFile": "config/connections.json",
+  "groups": [],
+  "users": []
+}

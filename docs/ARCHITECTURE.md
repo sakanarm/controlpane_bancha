@@ -190,6 +190,7 @@ Arak ไม่ต้องแก้โค้ด Bancha เป็น **adapter** 
 
 - **บัญชี** Bancha login เป็น `bancha-sync` (local SERVICE, `PLATFORM_ADMIN`) สร้างด้วย `server/arak-sync-account.js` รหัสสุ่มเก็บใน `.env` ของ Bancha (mode 600) audit ของ Arak จึงบอกได้ว่า Bancha เป็นคนแก้
 - **ใช้งาน** `node server/arak-push.js <desired.json> [--plan|--apply|--undo]` ค่า default คือ `--plan` พิมพ์สิ่งที่จะทำโดยไม่แก้อะไร รันซ้ำได้ ถ้าค่าตรงแล้วจะได้ "Arak already matches"
+- **อัตโนมัติ** server ของ Bancha (`server/arak-sync.js`) รัน `--apply` เองตอน start, เมื่อไฟล์ใน `ARAK_SYNC_FILE` (ตอนนี้ `config/arak.json`), `config/connections.json` หรือ manifest เปลี่ยน (เช็คทุก 5 วินาที) และทุกคืนตาม `ARAK_SYNC_AT` (default 02:00) ถ้าล้มเหลวจะลองใหม่ใน 10 นาที ดูผลล่าสุดที่ `GET /api/arak-sync` และรายละเอียดใน `pm2 logs bancha`
 - **User** หาด้วย email ก่อน แล้วค่อย username ของ `local` ถ้าไม่มีจะสร้าง USER แบบไม่มีรหัส (login ด้วย Microsoft เท่านั้น) ให้ role ที่ขาด และแทนที่ attribute `department`, `employeeType`, `country` เฉพาะแถว `local` บัญชี `entra` แก้ได้แค่ role และ attribute
 - **Group** สร้างเป็น GROUP `local` แล้วเพิ่ม member
 - **Connection** ส่งเฉพาะตัวที่ `grants.arak` มี โดยแบ่งเจ้าของ field ดังนี้
@@ -208,7 +209,8 @@ Arak ไม่ต้องแก้โค้ด Bancha เป็น **adapter** 
 1. API ลบ principal ไม่ได้ จึงทำได้แค่ปิด (`enabled = false`)
 2. ตั้ง `external_id` ผ่าน API ไม่ได้ ผูกด้วย email ไปก่อน
 3. Role ที่เปลี่ยนมีผลตอน user login ครั้งถัดไป
-4. Admin ของ Arak ยังแก้ค่าที่ Bancha ส่งไปใน UI ได้ Bancha จะเขียนทับรอบถัดไป ถ้าจะล็อก ("Managed by Bancha") ต้องให้ทีม Arak เพิ่ม source หรือ flag
+4. ลบออกจากไฟล์ไม่ได้แปลว่าลบใน Arak push ไม่ prune ถ้าจะถอนต้องรัน `--undo` กับรายการนั้น
+5. Admin ของ Arak ยังแก้ค่าที่ Bancha ส่งไปใน UI ได้ Bancha จะเขียนทับรอบถัดไป ถ้าจะล็อก ("Managed by Bancha") ต้องให้ทีม Arak เพิ่ม source หรือ flag
 
 **ผลทดสอบบน prod** สร้าง `bancha-test` (REQUESTER + DATA_OWNER), `bancha-test-group`, source `bancha-test-pg` (connect test ถึง PostgreSQL 16.15) ตรวจใน arakdb แบบ read-only แล้วตรง และ `arak-live-pg` ไม่ถูกแตะ ไฟล์ทดสอบคือ `server/arak-push.test.json`
 

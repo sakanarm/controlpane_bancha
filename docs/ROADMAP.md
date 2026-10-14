@@ -39,6 +39,7 @@
   - ตาราง "What Bancha sends to each app" และพรีวิว event รายคน (ARCHITECTURE §3.5 และ §12 ขั้น 0)
 - ✅ **Push เข้า Arak ผ่าน admin API** (14 Oct 2026, ARCHITECTURE §3.6): `server/arak-push.js` ส่ง user, group, role, attribute, data source และ OpenMetadata URL โดยไม่ต้องแก้โค้ด Arak ทดสอบบน prod ด้วยของทดสอบ `bancha-test*` แล้ว
   - Bancha login เป็น `bancha-sync` (สร้างด้วย `server/arak-sync-account.js`) ไม่ใช้ `admin` แล้ว
+  - push อัตโนมัติจาก server: ตอน start, เมื่อ `config/arak.json` หรือ `config/connections.json` เปลี่ยน และทุกคืน 02:00 (`server/arak-sync.js`) ตอนนี้ไฟล์มีแค่ connection ส่วน user และ group รอ DB ของ Bancha (1.2)
 
 ### ต้องทำต่อ
 

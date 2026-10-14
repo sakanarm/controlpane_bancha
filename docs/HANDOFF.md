@@ -49,6 +49,8 @@ ControlPane_Bancha/
 ├─ server/arak-push.js            push user, group, role, connection เข้า Arak ผ่าน admin API (--plan/--apply/--undo)
 ├─ server/arak-push.test.json     ชุดทดสอบ bancha-test* ที่ลองบน prod แล้ว
 ├─ server/arak-sync-account.js    สร้างบัญชี bancha-sync ใน Arak และเขียน login ลง .env
+├─ server/arak-sync.js            ให้ server รัน arak-push --apply เอง (start, ไฟล์เปลี่ยน, ทุกคืน)
+├─ config/arak.json               สิ่งที่ Bancha push เข้า Arak อัตโนมัติ (ตอนนี้แค่ connection)
 ├─ config/connections.json        รายการ connection (ไม่มี secret มีแค่ชื่อ env var)
 ├─ deploy/start.sh                entry point ของ pm2 (แบบเดียวกับ Arak)
 ├─ .env.example                   รายชื่อ env var ทั้งหมด (คัดลอกเป็น .env)
@@ -67,6 +69,7 @@ ControlPane_Bancha/
   - `GET /api/health`
   - `GET /api/connections` ส่ง connection ทั้งหมด พร้อมผล test ล่าสุด, ข้อมูลที่เจอ และ credential ที่ยังขาด
   - `POST /api/connections/:id/test` test ทันที
+  - `GET /api/arak-sync` สถานะ push อัตโนมัติเข้า Arak: เปิดอยู่ไหม, ไฟล์ที่ดู, รอบถัดไป และผลรอบล่าสุด (ไม่มี secret)
   - `GET /api/identity` user ของ Arak (`principal` พร้อม attribute, group และ role ที่มี scope) และ OpenMetadata (users API) จับคู่ด้วย email อ่านซ้ำทุก 5 นาทีหลัง test connection ใส่ `?refresh` เพื่ออ่านทันที ถ้าอ่านแอพไหนไม่ได้จะใช้รายชื่อล่าสุดที่อ่านได้ **มีชื่อและอีเมลจริง**
   - ตัด prefix `/bancha` ออกได้ (case-insensitive) เพื่อรองรับการวางหลัง nginx ที่ `/Bancha/`
 - Connector แต่ละประเภท **อ่านอย่างเดียว**
@@ -152,6 +155,8 @@ node server/arak-push.js server/arak-push.test.json            # --plan: พิ�
 node server/arak-push.js server/arak-push.test.json --apply
 node server/arak-push.js server/arak-push.test.json --undo     # ถอนของที่ไฟล์นี้ใส่
 ```
+
+Push อัตโนมัติเปิดด้วย `ARAK_SYNC_FILE=config/arak.json` ใน `.env` (เปิดแล้วบน prod) แก้ `config/arak.json` หรือ `config/connections.json` แล้ว `git pull` บน prod ไม่ต้อง restart server จะ push เองภายในไม่กี่วินาที
 
 ถ้าต้องสร้าง `bancha-sync` ใหม่ (Arak ตัวอื่น หรือเปลี่ยนรหัส) ส่งรหัส admin ทาง stdin ไม่ต้องเขียนลงไฟล์:
 `printf '%s

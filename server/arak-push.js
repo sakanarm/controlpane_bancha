@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Pushes users, groups and roles decided in Bancha into Arak, through Arak's own admin API (/v1/principals).
-// No change to Arak is needed: Bancha signs in as an Arak PLATFORM_ADMIN and calls the same endpoints Arak's Users screen uses.
+// Pushes users, groups, roles and connections decided in Bancha into Arak, through Arak's own admin API
+// (/v1/principals, /v1/sources, /v1/settings/openmetadata). No change to Arak is needed: Bancha signs in as an
+// Arak PLATFORM_ADMIN and calls the same endpoints Arak's Users, Sources and OpenMetadata screens use.
 //
 //   node server/arak-push.js <desired.json>           show what would change, change nothing
 //   node server/arak-push.js <desired.json> --apply   make the changes, then read Arak back and compare
@@ -13,6 +14,8 @@
 // - Only local principals can be enabled, disabled or join groups. Roles and local attribute rows can go on any principal.
 // - Only DATA_OWNER takes a scope. A role change reaches a user at their next sign-in, since roles are baked into the token.
 // - A user created without a password signs in with Microsoft, found by email.
+// - Arak seals a source login with its own key and never returns it, so Bancha sends it when it adds a source and
+//   otherwise leaves the stored one. Arak's OpenMetadata client takes a bot token, not a password login.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -141,12 +144,103 @@ async function main() {
     }
   }
 
+  const conns = loadConnections(want);
+  await planConnections(conns, step, undo, reason);
+
   if (!steps.length) console.log('Arak already matches. Nothing to do.');
   for (const s of steps) {
     if (!apply) { console.log('would ' + s.text); continue; }
     await s.fn(); console.log('done  ' + s.text);
   }
-  if (apply && steps.length) await verify(want, roleMap, undo);
+  if (apply) { await verify(want, roleMap, undo); await verifyConnections(conns, undo); }
+}
+
+// Connections. Bancha decides where and how to connect: engine, host, port, database and login.
+// Arak keeps the rest: enforcement mode, secure schema and pattern, table scope, OpenMetadata service, and whether the source is on.
+// Only connections whose grants name arak are sent, with the profile the grant names.
+const ENGINES = { postgresql: 'POSTGRES', mssql: 'SQLSERVER', 'sql server': 'SQLSERVER', mysql: 'MYSQL' };
+const STORED = 'fernet:stored'; // what Arak serves instead of a sealed login; sending it back keeps the stored one
+
+function loadConnections(want) {
+  const file = want.connectionsFile ? JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', want.connectionsFile), 'utf8')).connections : [];
+  return [...file, ...(want.connections || [])].filter(c => c.grants?.arak?.length);
+}
+const profileFor = c => c.profiles?.find(p => c.grants.arak.includes(p.p));
+function secretOf(c, prof) {
+  const v = prof && process.env[prof.secretEnv];
+  if (!v) throw new Error(`connection ${c.id}: set ${prof?.secretEnv || 'a secret'} in Bancha's .env`);
+  return v;
+}
+const findSource = (sources, c) => sources.find(s => s.name === c.id)
+  || sources.find(s => s.host.toLowerCase() === c.host.toLowerCase() && s.port === c.port && (s.defaultDatabase || '') === (c.db || ''));
+
+async function planConnections(conns, step, undo, reason) {
+  if (!conns.length) return;
+  const sources = await call('GET', '/v1/sources');
+  for (const c of conns) {
+    const label = `connection ${c.id}`;
+    if (c.type === 'OpenMetadata') {
+      if (undo) continue; // nothing is written for it unless the address changes, and an old address is not worth restoring
+      const om = await call('GET', '/v1/settings/openmetadata');
+      const prof = profileFor(c), token = prof?.tokenEnv ? process.env[prof.tokenEnv] : null;
+      const same = om.baseUrl.replace(/\/$/, '') === c.url.replace(/\/$/, '');
+      if (same && !token) console.log(`${label}: Arak already points at ${c.url} (${om.source}). Arak keeps its own token (${om.tokenSource}): it needs a bot token, and Bancha holds a password login`);
+      else step(`${label}: point Arak's OpenMetadata at ${c.url}${token ? " with Bancha's bot token" : ''}`,
+        () => call('PUT', '/v1/settings/openmetadata', { baseUrl: c.url, ...(token ? { jwtToken: token } : {}), reason }));
+      continue;
+    }
+    if (c.cat !== 'data_source') continue;
+    const engine = ENGINES[(c.type || '').toLowerCase()];
+    if (!engine) { console.log(`${label}: Arak has no ${c.type} engine, skipped`); continue; }
+    const s = findSource(sources, c);
+    if (undo) {
+      if (!s) continue;
+      if (s.name !== c.id || s.enabled || s.assetCount) { console.log(`${label}: Arak source ${s.name} stays. Bancha removes only a source it added that is still off and empty`); continue; }
+      step(`${label}: remove Arak source ${s.name}`, () => call('DELETE', '/v1/sources/' + s.id));
+      continue;
+    }
+    const prof = profileFor(c);
+    if (!s) {
+      step(`${label}: add Arak source ${c.id} (${engine} ${c.host}:${c.port}/${c.db}, login ${prof?.user}), off and enforcement NONE until an Arak admin turns it on`,
+        () => call('POST', '/v1/sources', { name: c.id, engine, host: c.host, port: c.port, defaultDatabase: c.db,
+          username: prof.user, password: secretOf(c, prof), enabled: false, defaultEnforcementMode: 'NONE' }));
+      continue;
+    }
+    const drift = [['host', s.host, c.host], ['port', s.port, c.port], ['database', s.defaultDatabase, c.db], ['engine', s.engine, engine]]
+      .filter(([, a, b]) => String(a ?? '').toLowerCase() !== String(b ?? '').toLowerCase());
+    if (!drift.length) { console.log(`${label}: linked to Arak source ${s.name}, host, port and database match`); continue; }
+    step(`${label}: update Arak source ${s.name}: ${drift.map(([k, a, b]) => `${k} ${a} -> ${b}`).join(', ')}`,
+      () => call('PUT', '/v1/sources/' + s.id, { name: s.name, engine, engineVersion: s.engineVersion, host: c.host, port: c.port, defaultDatabase: c.db,
+        credentialRef: s.credentialRef?.startsWith('fernet:') ? STORED : s.credentialRef, defaultEnforcementMode: s.defaultEnforcementMode,
+        omServiceFqn: s.omServiceFqn, secureSchema: s.secureSchema, secureObjectPattern: s.secureObjectPattern, tableScope: s.tableScope, enabled: s.enabled }));
+  }
+}
+
+// Asks Arak to connect with what Bancha sent. Neither probe saves anything except the engine version Arak reads.
+async function verifyConnections(conns, undo) {
+  if (!conns.length) return;
+  console.log('\nArak connections now:');
+  const sources = await call('GET', '/v1/sources');
+  for (const c of conns) {
+    if (c.type === 'OpenMetadata') {
+      if (undo) continue;
+      const om = await call('GET', '/v1/settings/openmetadata');
+      const probe = await call('POST', '/v1/settings/openmetadata/test', { baseUrl: c.url });
+      console.log(`  ${c.id}: Arak uses ${om.baseUrl} (${om.source}), token from ${om.tokenSource}`);
+      console.log(`    probe: ${JSON.stringify(probe).slice(0, 200)}`);
+      if (om.baseUrl.replace(/\/$/, '') !== c.url.replace(/\/$/, '')) { console.log('    DOES NOT MATCH the file'); process.exitCode = 1; }
+      else console.log('    MATCHES the file');
+      continue;
+    }
+    if (c.cat !== 'data_source' || !ENGINES[(c.type || '').toLowerCase()]) continue;
+    const s = findSource(sources, c);
+    if (undo) { console.log(`  ${c.id}: ${s ? 'still in Arak as ' + s.name : 'not in Arak'}`); continue; }
+    if (!s) { console.log(`  ${c.id}: missing`); process.exitCode = 1; continue; }
+    const t = await call('POST', `/v1/sources/${s.id}/test`);
+    console.log(`  ${c.id}: Arak source ${s.name} ${s.engine} ${s.host}:${s.port}/${s.defaultDatabase} enabled=${s.enabled} enforcement=${s.defaultEnforcementMode} login=${s.credentialRef === STORED ? 'sealed by Arak' : s.credentialRef}`);
+    console.log(`    connect test: ${t.reachable ? 'reachable' : 'NOT reachable'} ${t.productName || ''} ${t.engineVersion || ''} ${t.message ? '- ' + t.message : ''}`);
+    if (!t.reachable) process.exitCode = 1;
+  }
 }
 
 // Reads Arak back and compares it with the file.

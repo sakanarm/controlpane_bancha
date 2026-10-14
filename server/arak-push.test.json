@@ -1,5 +1,19 @@
 {
   "reason": "Bancha test: central config pushed to Arak (safe to remove)",
+  "connectionsFile": "config/connections.json",
+  "connections": [
+    {
+      "id": "bancha-test-pg",
+      "cat": "data_source",
+      "type": "PostgreSQL",
+      "host": "10.4.155.151",
+      "port": 5432,
+      "db": "postgres",
+      "note": "Test only. The postgres maintenance database on the arakdb server, so Arak's live source arak-live-pg is not touched.",
+      "profiles": [{ "p": "read", "user": "arak", "secretEnv": "CONN_ARAKDB_PASSWORD" }],
+      "grants": { "arak": ["read"] }
+    }
+  ],
   "groups": [
     { "name": "bancha-test-group", "displayName": "Bancha test group (safe to remove)" }
   ],

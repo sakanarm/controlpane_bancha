@@ -2,7 +2,7 @@
 
 > สถานะ: Draft v0.1 · 13 Oct 2026
 > Prototype UI: `prototype/control-plane.html`
-> Contract: `contracts/` · Database: `db/schema.sql`
+> Contract: `contracts/` · Database: `db/migrations/`
 
 ---
 
@@ -193,6 +193,8 @@ Arak ไม่ต้องแก้โค้ด Bancha เป็น **adapter** 
 - **อัตโนมัติ** server ของ Bancha (`server/arak-sync.js`) รัน `--apply` เองตอน start, เมื่อไฟล์ใน `ARAK_SYNC_FILE` (ตอนนี้ `config/arak.json`), `config/connections.json` หรือ manifest เปลี่ยน (เช็คทุก 5 วินาที) และทุกคืนตาม `ARAK_SYNC_AT` (default 02:00) ถ้าล้มเหลวจะลองใหม่ใน 10 นาที ดูผลล่าสุดที่ `GET /api/arak-sync` และรายละเอียดใน `pm2 logs bancha`
 - **User** หาด้วย email ก่อน แล้วค่อย username ของ `local` ถ้าไม่มีจะสร้าง USER แบบไม่มีรหัส (login ด้วย Microsoft เท่านั้น) ให้ role ที่ขาด และแทนที่ attribute `department`, `employeeType`, `country` เฉพาะแถว `local` บัญชี `entra` แก้ได้แค่ role และ attribute
 - **Group** สร้างเป็น GROUP `local` แล้วเพิ่ม member
+- **จาก DB ของ Bancha** (`server/arak-desired.js`) เมื่อ DB พร้อม ทุกการแก้ใน admin API จะสั่ง push ภายในไม่กี่วินาที ส่งเฉพาะ group ที่มี role ของ Arak และ user ที่ได้ role ของ Arak (ตรง หรือผ่าน group) พร้อม field ที่ manifest ขอ (PDPA §3.4) role ของ group ให้กับ member แต่ละคนใน Arak (`role_bindings.scope` ส่งเป็น scope ของ role) user ที่ disabled หรือ deleted ใน Bancha ส่งไปเป็น disabled ถ้าชื่อเดียวกันอยู่ในไฟล์ด้วย ค่าในไฟล์ชนะ
+- **เอาคืน** `app_sync_state` จำ role และการเป็นสมาชิก group ที่ Bancha ให้ใน Arak แล้ว (หลัง push ที่สำเร็จและไม่มี mismatch) ถ้าเลิกต้องการจะส่งเป็น `revoke` และ `leave` จึงเอาคืนเฉพาะที่ Bancha ให้ ไม่แตะ role ที่ admin ของ Arak ให้เอง
 - **Connection** ส่งเฉพาะตัวที่ `grants.arak` มี โดยแบ่งเจ้าของ field ดังนี้
 
 | Field | เจ้าของ |
@@ -209,7 +211,7 @@ Arak ไม่ต้องแก้โค้ด Bancha เป็น **adapter** 
 1. API ลบ principal ไม่ได้ จึงทำได้แค่ปิด (`enabled = false`)
 2. ตั้ง `external_id` ผ่าน API ไม่ได้ ผูกด้วย email ไปก่อน
 3. Role ที่เปลี่ยนมีผลตอน user login ครั้งถัดไป
-4. ลบออกจากไฟล์ไม่ได้แปลว่าลบใน Arak push ไม่ prune ถ้าจะถอนต้องรัน `--undo` กับรายการนั้น
+4. ลบออกจาก**ไฟล์**ไม่ได้แปลว่าลบใน Arak ถ้าจะถอนต้องรัน `--undo` กับรายการนั้น ส่วนที่มาจาก DB ของ Bancha เอาคืนได้เอง (ดู "เอาคืน" ด้านบน) แต่ยังลบบัญชีไม่ได้ (ข้อ 1)
 5. Admin ของ Arak ยังแก้ค่าที่ Bancha ส่งไปใน UI ได้ Bancha จะเขียนทับรอบถัดไป ถ้าจะล็อก ("Managed by Bancha") ต้องให้ทีม Arak เพิ่ม source หรือ flag
 
 **ผลทดสอบบน prod** สร้าง `bancha-test` (REQUESTER + DATA_OWNER), `bancha-test-group`, source `bancha-test-pg` (connect test ถึง PostgreSQL 16.15) ตรวจใน arakdb แบบ read-only แล้วตรง และ `arak-live-pg` ไม่ถูกแตะ ไฟล์ทดสอบคือ `server/arak-push.test.json`
@@ -482,7 +484,7 @@ OpenMetadata มี user, team และ role ของตัวเอง แต
 
 ## 9. Data model
 
-ดู `db/schema.sql` ตารางหลัก:
+ดู `db/migrations/001_init.sql` (รันโดย `server/db.js`) ตารางหลัก:
 
 - `directories`, `users`, `groups`, `group_members`
 - `apps`, `app_manifests` (มี history), `app_roles`, `app_credentials`, `registration_tokens`

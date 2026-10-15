@@ -1,4 +1,5 @@
-// Bancha control plane: serves the console and tests the real connections in config/connections.json.
+// Bancha control plane: serves the console, tests the real connections in config/connections.json, and serves the
+// admin API on Bancha's own database (server/admin-api.js; off until BANCHA_DB_NAME is set).
 // Every check is read-only: Postgres sessions run with default_transaction_read_only=on, HTTP calls are GETs
 // (plus the login call OpenMetadata and Azure AD need to issue a token). Secrets come from the environment only.
 'use strict';
@@ -8,6 +9,8 @@ const path = require('path');
 const { Client } = require('pg');
 const arakSync = require('./arak-sync');
 const auth = require('./auth');
+const db = require('./db');
+const adminApi = require('./admin-api');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 3950);
@@ -228,6 +231,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, out);
     }
     if (p === '/api/arak-sync' && req.method === 'GET') return send(res, 200, arakSync.status());
+    if (p === '/api/db' && req.method === 'GET') return send(res, 200, db.status());
+    if (p.startsWith('/api/v1/admin/')) {
+      const [code, body] = await adminApi.handle(req, p, url, { actor: auth.current(req), ip: req.socket.remoteAddress }, arakSync.poke);
+      return send(res, code, body);
+    }
     if (p === '/api/connections' && req.method === 'GET') return send(res, 200, { live: true, connections: CONFIG.map(view) });
     const m = p.match(/^\/api\/connections\/([\w-]+)\/test$/);
     if (m && req.method === 'POST') {
@@ -250,4 +258,5 @@ server.listen(PORT, HOST, () => {
   const all = () => Promise.all(CONFIG.map(runTest)).then(refreshIdentity).catch(e => console.error('[identity]', e.message));
   all(); setInterval(all, RETEST_MS).unref();
   arakSync.start();
+  db.start(() => arakSync.poke('database ready'));
 });

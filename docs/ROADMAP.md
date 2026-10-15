@@ -24,7 +24,7 @@
 - ✅ Architecture และการตัดสินใจหลัก D1–D7 (`docs/ARCHITECTURE.md`)
 - ✅ Bancha App Contract v1: JSON Schema + manifest ตัวอย่างของ Arak, Prajak, OpenMetadata (`contracts/`)
   - 14 Oct 2026: role มี `appValue` และ `scoped`, user มี `match` และ `keeps`, manifest ของ Arak ใช้ role และ attribute จริงจาก arakdb
-- ✅ Database schema ร่าง (`db/schema.sql`) ยังไม่ได้ใช้จริง
+- ✅ Database schema (ตอนนี้เป็น `db/migrations/001_init.sql` ดู Phase 1)
 - ✅ Prototype UI หน้าตาแบบ Arak, sidebar สี navy, มีโลโก้แอพ (`prototype/control-plane.html`)
   - หน้า Login แบบเดียวกับ Arak: Sign in with MFEC หรือ username/password
   - Sidebar 2 กลุ่ม: **Control plane** (Overview, Users & groups, Connections, App registry, Distribution) เฉพาะ admin และ **Go to app** (My apps + แอพที่มีสิทธิ์)
@@ -67,16 +67,16 @@
 
 | # | งาน | ขึ้นกับ |
 |---|---|---|
-| 1.1 | ตัดสินใจว่า **DB ของ Bancha** อยู่ที่ไหน (แนะนำ database `bancha` แยกบน Postgres 10.4.155.151 ใช้ user `bancha` ของตัวเอง ห้ามใช้ user `arak`) | เจ้าของ DB |
-| 1.2 | Migration จาก `db/schema.sql` (เลือก tool: node-pg-migrate หรือ Prisma แบบเดียวกับ auth-service) | 1.1 |
-| 1.3 | Admin API ตาม `ARCHITECTURE.md` §10: users, groups, role bindings, connections, apps | 1.2 |
+| 1.1 | ตัดสินใจว่า **DB ของ Bancha** อยู่ที่ไหน (แนะนำ database `bancha` แยกบน Postgres 10.4.155.151 ใช้ user `bancha` ของตัวเอง ห้ามใช้ user `arak`) 🟡 ตัดสินใจแล้ว (14 Oct 2026) รอเจ้าของ Postgres สร้าง role และ database (SQL อยู่ใน HANDOFF) | เจ้าของ DB |
+| 1.2 | ✅ Migration: `db/migrations/*.sql` รันโดย `server/db.js` ตอน server start (หรือ `node server/db.js`) ทีละไฟล์ใน transaction เดียว เก็บ checksum ใน `schema_migrations` ไม่ใช้ node-pg-migrate หรือ Prisma เพราะ SQL ธรรมดาพอและไม่มี dependency เพิ่ม ทดสอบกับ Postgres local แล้ว | 1.1 |
+| 1.3 | 🟡 Admin API ตาม `ARCHITECTURE.md` §10 (`server/admin-api.js`, `/api/v1/admin/*`): users, groups, members, role bindings, apps (อ่านจาก manifest) และ audit เสร็จแล้ว ส่วน connections ยังอยู่ในไฟล์ `config/connections.json` รอ 1.4 หน้า **Users & groups** ใน console ใช้ API นี้เมื่อมี DB (ไม่มี DB ยังเป็น sample data) | 1.2 |
 | 1.4 | เก็บ connection secret แบบ envelope encryption ใน Postgres (master key อยู่ใน `.env`) แทนการใส่ทุกตัวใน `.env` | 1.2 |
 | 1.5 | Azure AD sync: ดึง users/groups ตาม filter แล้วเก็บใน DB ทุก 15 นาที + delta | 0.3, 1.2 |
 | 1.6 | Login จริงด้วย Entra OIDC (Authorization Code + PKCE) และ session cookie กำหนด admin จาก group ใน Azure AD | 0.3 |
 | 1.7 | App registry: register ด้วย manifest + validate กับ JSON Schema และ health check `/.well-known/bancha/health` | 1.2 |
 | 1.8 | Outbox `change_log` + webhook (CloudEvents, HMAC) + `GET /feed?after=seq` + snapshot | 1.2 |
-| 1.9 | Arak integration ตาม ARCHITECTURE §12: ขั้น 1–2 ทำได้แล้วผ่าน admin API (§3.6) เหลือให้ Bancha push ข้อมูลจริงจาก DB ของตัวเอง ขั้น 3 (ล็อก field ใน UI ของ Arak และเก็บ `external_id`) | 1.2 และขั้น 3 ต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
-| 1.10 | Audit log ทุกการแก้ไข | 1.2 |
+| 1.9 | Arak integration ตาม ARCHITECTURE §12: ขั้น 1–2 ทำได้แล้วผ่าน admin API (§3.6) และ 🟡 Bancha push users, groups และ role จาก DB ของตัวเองแล้ว รวมถึงการเอาคืน (revoke role, ออกจาก group) เฉพาะที่ Bancha เคยให้ (`server/arak-desired.js`) ใช้จริงบน prod เมื่อมี DB (1.1) ขั้น 3 (ล็อก field ใน UI ของ Arak และเก็บ `external_id`) | 1.2 และขั้น 3 ต้องให้ทีม Arak แก้โค้ดฝั่ง Arak เพราะ Bancha ห้ามแก้ของคนอื่น |
+| 1.10 | ✅ Audit log ทุกการแก้ไข: ทุก write ของ admin API ลง `audit_log` (ใคร, ทำอะไร, ค่าก่อนและหลัง) ใน transaction เดียวกับการแก้ และเพิ่ม event ใน `change_log` | 1.2 |
 
 ผลลัพธ์ที่ใช้ตัดสินว่าจบ Phase 1: เพิ่ม user เข้า group ใน Bancha แล้ว Arak เห็นภายใน 1 นาที และ connection ที่ Arak ใช้ถูกจัดการจาก Bancha
 

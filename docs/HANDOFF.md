@@ -19,9 +19,10 @@ Bancha ไม่ถือ business data เช่น DQ result, policy หรื
 |---|---|
 | UI | Prototype ครบทุกเมนู หน้าตาแบบ Arak (Untitled UI, font Inter, สีหลัก `#1570ef`) sidebar สี navy มีโลโก้ Arak, Prajak, OpenMetadata (ไฟล์ต้นฉบับใน `prototype/assets/` และฝังเป็น base64 ใน HTML) กระดิ่งแจ้งเตือนเปิดเป็น panel และนับเฉพาะเรื่องที่ยังไม่อ่าน |
 | Connections | **ต่อจริง** แบบ read-only ผ่าน `server/server.js` |
-| หน้าอื่น (Overview, Users & groups, App registry, Distribution) | ยังเป็น **sample data** ใน HTML |
-| Login | ยังเป็น prototype: รหัสอะไรก็ได้ หรือเลือก sample account |
-| DB ของ Bancha | ยังไม่มี (`db/schema.sql` เป็นแค่ร่าง) |
+| Users & groups | ใช้ **DB ของ Bancha** เมื่อตั้ง `BANCHA_DB_NAME` (เพิ่ม/แก้/ปิด/ลบ user, group, สมาชิก, role แล้ว push เข้า Arak เอง) ถ้าไม่มี DB ยังเป็น sample data แท็บ Across apps อ่านจาก Arak และ OM จริง |
+| หน้าอื่น (Overview, App registry, Distribution) | ยังเป็น **sample data** ใน HTML |
+| Login | ด้วยบัญชี Arak รับเฉพาะ `PLATFORM_ADMIN` (`server/auth.js`) ส่วน Sign in with MFEC รอ Azure AD |
+| DB ของ Bancha | Migration และ admin API พร้อมแล้ว ทดสอบกับ Postgres local บน prod **ยังไม่มี** database `bancha` รอเจ้าของ Postgres สร้าง (หัวข้อ 5 "DB ของ Bancha") ระหว่างนี้ prod ตอบ 503 ที่ `/api/v1/admin` และหน้า Users & groups เป็น sample data |
 | Git | อยู่บน https://github.com/sakanarm/controlpane_bancha branch `main` |
 | Prod | Deploy แล้ว 14 Oct 2026: pm2 ชื่อ `bancha` (id 13), `BIND_HOST=0.0.0.0` เข้าได้ที่ http://10.4.155.151:3950/ (แบบเดียวกับ Arak ที่ :8090) `pm2 save` แล้ว ยังไม่มี nginx `/Bancha` |
 
@@ -50,13 +51,17 @@ ControlPane_Bancha/
 ├─ server/arak-push.test.json     ชุดทดสอบ bancha-test* ที่ลองบน prod แล้ว
 ├─ server/arak-sync-account.js    สร้างบัญชี bancha-sync ใน Arak และเขียน login ลง .env
 ├─ server/auth.js                 login ของคอนโซล: ตรวจรหัสกับ Arak รับเฉพาะ PLATFORM_ADMIN, session ใน memory
-├─ server/arak-sync.js            ให้ server รัน arak-push --apply เอง (start, ไฟล์เปลี่ยน, ทุกคืน)
+├─ server/arak-sync.js            ให้ server รัน arak-push --apply เอง (start, ไฟล์เปลี่ยน, DB เปลี่ยน, ทุกคืน)
+├─ server/db.js                   pool ของ DB Bancha + รัน migration (`node server/db.js [--status]`)
+├─ server/admin-api.js            /api/v1/admin: users, groups, members, role bindings, apps, audit
+├─ server/arak-desired.js         อ่าน DB แล้วบอกว่า Arak ควรมีอะไร รวมถึงสิ่งที่ต้องเอาคืน
+├─ server/manifests.js            อ่าน manifest ใน contracts/examples (app และ role ที่ให้ได้)
 ├─ config/arak.json               สิ่งที่ Bancha push เข้า Arak อัตโนมัติ (ตอนนี้แค่ connection)
 ├─ config/connections.json        รายการ connection (ไม่มี secret มีแค่ชื่อ env var)
 ├─ deploy/start.sh                entry point ของ pm2 (แบบเดียวกับ Arak)
 ├─ .env.example                   รายชื่อ env var ทั้งหมด (คัดลอกเป็น .env)
 ├─ contracts/                     Bancha App Contract v1: schema + manifest ตัวอย่าง
-├─ db/schema.sql                  ร่าง schema ของ Phase 1 (ยังไม่ได้ใช้)
+├─ db/migrations/                 schema ของ DB Bancha (001_init.sql) รันตามลำดับ ห้ามแก้ไฟล์ที่รันไปแล้ว ให้เพิ่มไฟล์ใหม่
 └─ docs/                          ARCHITECTURE, ROADMAP, HANDOFF
 ```
 
@@ -72,6 +77,8 @@ ControlPane_Bancha/
   - `GET /api/connections` ส่ง connection ทั้งหมด พร้อมผล test ล่าสุด, ข้อมูลที่เจอ และ credential ที่ยังขาด
   - `POST /api/connections/:id/test` test ทันที
   - `GET /api/arak-sync` สถานะ push อัตโนมัติเข้า Arak: เปิดอยู่ไหม, ไฟล์ที่ดู, รอบถัดไป และผลรอบล่าสุด (ไม่มี secret)
+  - `GET /api/db` สถานะ DB ของ Bancha (เปิดไหม, พร้อมไหม, migration ที่รันแล้ว)
+  - `/api/v1/admin/*` admin API (`server/admin-api.js` มีรายการ route ที่หัวไฟล์) ทุก write ลง `audit_log` และ `change_log` ใน transaction เดียวกัน แล้วสั่ง push เข้า Arak ภายในไม่กี่วินาที ถ้า DB ยังไม่พร้อมตอบ 503
   - `GET /api/identity` user ของ Arak (`principal` พร้อม attribute, group และ role ที่มี scope) และ OpenMetadata (users API) จับคู่ด้วย email อ่านซ้ำทุก 5 นาทีหลัง test connection ใส่ `?refresh` เพื่ออ่านทันที ถ้าอ่านแอพไหนไม่ได้จะใช้รายชื่อล่าสุดที่อ่านได้ **มีชื่อและอีเมลจริง**
   - ตัด prefix `/bancha` ออกได้ (case-insensitive) เพื่อรองรับการวางหลัง nginx ที่ `/Bancha/`
 - Connector แต่ละประเภท **อ่านอย่างเดียว**
@@ -89,6 +96,7 @@ ControlPane_Bancha/
   - ตาราง field mapping อยู่ใน `XFIELDS`, ของที่แอพเก็บเองใน `XKEEP`, role ของ Arak ใน `XROLES` ต้องตรงกับ ARCHITECTURE §3.5 และ manifest ใน `contracts/`
   - คลิกชื่อคนเปิด `xuserDrawer()` พรีวิว event ที่จะส่ง เป็นพรีวิวเท่านั้น ไม่ส่งอะไรออกไป
 - Prod เปิดผ่าน http ธรรมดาบน IP ไม่ใช่ secure context: ห้ามใช้ `crypto.randomUUID`, `crypto.subtle`, `navigator.clipboard` โดยไม่มี fallback (เคยทำให้หน้าขาวทั้งหน้า) หลัง deploy ให้เปิดเช็คจาก URL จริง ไม่ใช่แค่ localhost
+- DB mode: `loadDb()` เช็ค `api/db` ถ้าพร้อมจะโหลด user, group, app, role binding ลง `BDB` แล้วหน้า Users & groups ใช้ `dbIdentity()` แทน sample data drawer ต่าง ๆ ชื่อขึ้นต้นด้วย `db` (`dbUserDrawer`, `dbGroupDrawer`, `dbGrantDrawer`) ฟอร์มส่งผ่าน `dbSubmit()` และหลังแก้จะดูผล push เข้า Arak ด้วย `dbWatchSync()`
 - Sidebar อยู่ที่ `navHTML()` และแต่ละหน้าอยู่ใน `PAGES`
 - Login: ถ้าเปิดผ่าน server ที่ `BANCHA_AUTH=arak` (default) หน้า login จะส่งรหัสไป `api/login` และไม่มีปุ่ม MFEC (`AUTH.mode = 'arak'`, คนที่ login แล้วสร้างด้วย `arakUser()` ไม่ได้อยู่ใน `USERS`) ถ้าเปิดเป็น `file://` หรือ `BANCHA_AUTH=off` จะใช้ sample account แบบเดิม และ session อยู่ใน `sessionStorage` key `bancha-session`
 - Admin คือคนที่อยู่ group `DG-Platform-Admins` หรือ `bg.admin` ส่วนคนอื่นเห็นแค่ My apps
@@ -107,6 +115,7 @@ npm start                 # http://127.0.0.1:3950/
 ```
 
 - Login แบบ prototype ใช้รหัสอะไรก็ได้ ลองใช้ `sakan.pu` (Sakan Punyanon, admin) หรือ `bg.admin` (admin) และ `siriporn.k` (ไม่ใช่ admin) หรือกด "Sign in with MFEC" แล้วเลือก sample account
+- DB ของ Bancha บน local: ต้องมี Postgres 15+ ที่สร้าง role และ database ไว้ (เหมือนหัวข้อ 5 "DB ของ Bancha") แล้วใส่ `BANCHA_DB_*` ใน `.env` server จะ migrate เอง ไม่ใส่ก็ได้ หน้า Users & groups จะเป็น sample data
 - เปิดไฟล์ HTML ตรง ๆ ได้ แต่จะเห็นแค่ sample data และไม่มี live connection
 
 ---
@@ -164,6 +173,32 @@ Push อัตโนมัติเปิดด้วย `ARAK_SYNC_FILE=config/
 `printf '%s
 ' '<admin password>' | ARAK_ADMIN_USER=admin node server/arak-sync-account.js [--rotate]`
 
+### DB ของ Bancha (ROADMAP 1.1, รอเจ้าของ Postgres)
+
+เจ้าของ Postgres บน 10.4.155.151 (superuser) รันทีละคำสั่ง:
+
+```sql
+CREATE ROLE bancha LOGIN PASSWORD '<รหัสใหม่>';
+CREATE DATABASE bancha OWNER bancha;
+REVOKE ALL ON DATABASE bancha FROM PUBLIC;
+```
+
+ถ้า `pg_hba.conf` ไม่รับ user ใหม่จาก 127.0.0.1 ให้เพิ่ม `host bancha bancha 127.0.0.1/32 scram-sha-256` แล้ว reload role `bancha` ไม่ต้องเป็น superuser และไม่ต้องมี CREATEROLE ส่วน `pgcrypto` และ `citext` เป็น trusted extension เจ้าของ database สร้างเองได้
+
+จากนั้นใส่ใน `.env` ของ Bancha (mode 600) แล้ว restart:
+
+```bash
+BANCHA_DB_NAME=bancha
+BANCHA_DB_USER=bancha
+BANCHA_DB_PASSWORD=<รหัสใหม่>
+```
+
+```bash
+pm2 restart bancha && sleep 3 && curl -s http://127.0.0.1:3950/api/health && pm2 logs bancha --lines 20 --nostream | grep -F "[db]"
+```
+
+server รัน migration เองตอน start (ถ้า DB ยังไม่ตอบจะลองใหม่ทุกนาที) ห้ามใช้ user `arak` และห้ามสร้างตารางใน arakdb
+
 ### nginx `/Bancha` (ต้องให้เจ้าของ server ทำ เพราะต้องใช้ sudo และเป็นไฟล์ที่แชร์กัน)
 
 ตัวอย่าง location ที่จะขอให้เพิ่ม:
@@ -199,7 +234,7 @@ UI เรียก API ด้วย relative path (`api/...`) จึงทำง
 
 1. ขอของที่ขาดตาม ROADMAP Phase 0 (0.1–0.7) แล้วใส่ใน `.env` และกด Test all ในหน้า Connections
 2. ได้รับอนุมัติแล้วค่อย deploy prod ตามหัวข้อ 5 (ตอนอยู่บน prod จะ test auth-service ได้)
-3. เริ่ม Phase 1: ตกลงเรื่อง DB ของ Bancha ก่อน (ROADMAP 1.1) แล้วตามด้วย Azure AD sync เพื่อให้หน้า Users & groups ใช้ข้อมูลจริง
+3. Phase 1: ขอให้เจ้าของ Postgres สร้าง database `bancha` (หัวข้อ 5) แล้วใส่ใน `.env` ของ prod ต่อด้วย connection secret ใน DB (1.4) และ Azure AD sync (1.5)
 
 ## 8. ความเสี่ยงที่ควรรู้
 

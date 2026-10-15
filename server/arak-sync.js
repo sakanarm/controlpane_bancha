@@ -1,5 +1,10 @@
 // Keeps Arak in line with Bancha without anyone running a command: arak-push.js --apply runs when Bancha starts,
-// when the desired file (or the connections file or manifest it relies on) changes, and every night as a reconcile.
+// when the desired file (or the connections file or manifest it relies on) changes, when an admin changes users,
+// groups or roles in the Bancha database (poke), and every night as a reconcile.
+//
+// What is pushed: the desired file (connections, and any users or groups written there) plus, once the database is
+// ready, the users and groups that hold Arak roles in it (server/arak-desired.js). The combined JSON goes to
+// arak-push.js on stdin, so people's details are never written to a file.
 //
 // Env: ARAK_SYNC_FILE   desired file, relative to the repo (for example config/arak.json). Unset = off.
 //      ARAK_SYNC_AT     nightly run, HH:MM server time (default 02:00)
@@ -8,17 +13,19 @@
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
+const db = require('./db');
+const { arakDesired, markPushed } = require('./arak-desired');
 
 const ROOT = path.resolve(__dirname, '..');
 const PUSH = path.join(__dirname, 'arak-push.js');
 const MANIFEST = path.join(ROOT, 'contracts', 'examples', 'arak.bancha-app.yaml');
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
 const WATCH_MS = 5000;     // stat polling survives git pull replacing the file, which fs.watch does not always
-const SETTLE_MS = 3000;    // a pull touches several files; push once after they settle
+const SETTLE_MS = 3000;    // a pull touches several files, an admin may make several changes; push once after they settle
 const RETRY_MS = 10 * 60 * 1000; // after a failed push, try again rather than wait for the night
 
-const state = { enabled: false, reason: '', file: null, at: null, running: false, next: null, last: null };
-let pending = null, settle = null, retry = null;
+const state = { enabled: false, reason: '', file: null, at: null, running: false, next: null, last: null, fromDb: null };
+let pending = null, settle = null, retry = null, snapshot = null;
 
 function log(line) { console.log('[arak-sync] ' + line); }
 
@@ -41,26 +48,63 @@ function changed(what) {
   settle = setTimeout(() => run('change: ' + what), SETTLE_MS);
 }
 
-function run(trigger) {
+// The file, plus the database's users and groups. A name in both: the file's entry wins, so a hand-written fix can override.
+async function desired() {
+  const want = JSON.parse(fs.readFileSync(state.file, 'utf8'));
+  snapshot = null;
+  if (!db.ready) { state.fromDb = null; return want; }
+  const fromDb = await arakDesired();
+  snapshot = fromDb.snapshot;
+  const lc = s => (s || '').toLowerCase();
+  const has = (list, key, v) => !!v && (list || []).some(x => lc(x[key]) === lc(v));
+  want.groups = [...(want.groups || []), ...fromDb.groups.filter(g => !has(want.groups, 'name', g.name))];
+  want.users = [...(want.users || []), ...fromDb.users.filter(u => !has(want.users, 'username', u.username) && !has(want.users, 'email', u.email))];
+  state.fromDb = { users: fromDb.users.length, groups: fromDb.groups.length,
+    revoke: fromDb.users.reduce((n, u) => n + (u.revoke || []).length + (u.leave || []).length, 0) };
+  return want;
+}
+
+async function run(trigger) {
   if (state.running) { pending = trigger; return; }
   state.running = true;
   clearTimeout(retry);
   const startedAt = new Date().toISOString();
   log(`push (${trigger})`);
-  execFile(process.execPath, [PUSH, state.file, '--apply'], { cwd: ROOT, env: process.env, timeout: RUN_TIMEOUT_MS, maxBuffer: 4 << 20 }, (err, stdout, stderr) => {
-    const lines = (stdout + stderr).split('\n').filter(Boolean);
-    for (const l of lines) log('  ' + l);
-    const error = lines.find(l => l.startsWith('error: '));
-    state.last = { trigger, startedAt, finishedAt: new Date().toISOString(), ok: !err,
-      changes: lines.filter(l => l.startsWith('done ')).length,
-      mismatches: lines.filter(l => /DOES NOT MATCH|NOT reachable|: missing$/.test(l)).length,
-      error: error ? error.slice(7) : err ? (err.killed ? 'timed out' : 'exit ' + err.code) : null };
-    log(`${state.last.ok ? 'ok' : 'FAILED'}: ${state.last.changes} change(s)${state.last.error ? ', ' + state.last.error : ''}`);
-    state.running = false;
-    watch(state.file);
-    if (pending) { const t = pending; pending = null; run(t); }
-    else if (!state.last.ok) retry = setTimeout(() => run('retry after failure'), RETRY_MS).unref();
-  });
+  let input;
+  try { input = JSON.stringify(await desired()); } catch (e) {
+    return finish(trigger, startedAt, { code: 1 }, '', 'error: cannot build what Arak should hold: ' + e.message);
+  }
+  const child = execFile(process.execPath, [PUSH, '-', '--apply'], { cwd: ROOT, env: process.env, timeout: RUN_TIMEOUT_MS, maxBuffer: 4 << 20 },
+    (err, stdout, stderr) => finish(trigger, startedAt, err, stdout, stderr));
+  child.stdin.end(input);
+}
+
+function finish(trigger, startedAt, err, stdout, stderr) {
+  const lines = (stdout + stderr).split('\n').filter(Boolean);
+  // Step lines and results go to the log; the roles, attributes and groups each person holds in Arak stay out of it.
+  for (const l of lines) if (!/^    (roles|attrs|groups):/.test(l)) log('  ' + l);
+  const error = lines.find(l => l.startsWith('error: '));
+  state.last = { trigger, startedAt, finishedAt: new Date().toISOString(), ok: !err,
+    changes: lines.filter(l => l.startsWith('done ')).length,
+    mismatches: lines.filter(l => /DOES NOT MATCH|NOT reachable|: missing$/.test(l)).length,
+    error: error ? error.slice(7) : err ? (err.killed ? 'timed out' : 'exit ' + err.code) : null };
+  log(`${state.last.ok ? 'ok' : 'FAILED'}: ${state.last.changes} change(s)${state.last.error ? ', ' + state.last.error : ''}`);
+  // Only a clean push is remembered, so what Bancha takes back later is exactly what it is sure it gave.
+  if (state.last.ok && !state.last.mismatches && snapshot)
+    return markPushed(snapshot).catch(e => log('could not record the push: ' + e.message)).finally(() => next());
+  next();
+}
+
+function next() {
+  state.running = false;
+  watch(state.file);
+  if (pending) { const t = pending; pending = null; run(t); }
+  else if (!state.last.ok) retry = setTimeout(() => run('retry after failure'), RETRY_MS).unref();
+}
+
+// Called after a committed change in the Bancha database. Changes close together become one push.
+function poke(what) {
+  if (state.enabled) changed('db: ' + what);
 }
 
 // Next HH:MM in server time, then every day after.
@@ -92,4 +136,4 @@ function status() {
   return { ...state, file: state.file && path.relative(ROOT, state.file).replace(/\\/g, '/'), watching: [...watched].map(f => path.relative(ROOT, f).replace(/\\/g, '/')) };
 }
 
-module.exports = { start, status };
+module.exports = { start, status, poke };

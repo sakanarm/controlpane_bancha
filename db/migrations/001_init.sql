@@ -1,5 +1,7 @@
--- Bancha control plane schema (PostgreSQL 15+)
+-- Bancha control plane schema (PostgreSQL 15+; prod is 16). Applied by server/db.js (on server start, or node server/db.js), once, in one transaction.
+-- Never edit a migration that has run anywhere: add the next numbered file instead.
 -- Every mutable resource carries `version`, bumped on each change and copied into change_log.
+-- pgcrypto and citext are trusted extensions, so the database owner can create them without a superuser.
 
 create extension if not exists pgcrypto;
 create extension if not exists citext;
@@ -134,11 +136,12 @@ create table role_bindings (
   role_key        text not null,
   subject_type    text not null check (subject_type in ('user', 'group')),
   subject_id      uuid not null,
+  scope           text,                                   -- for scoped roles, e.g. Arak data-owner: an OpenMetadata FQN
   granted_by      uuid references users(id),
   granted_at      timestamptz not null default now(),
   version         bigint not null default 1,
   foreign key (app_key, role_key) references app_roles(app_key, role_key),
-  unique (app_key, role_key, subject_type, subject_id)
+  unique nulls not distinct (app_key, role_key, subject_type, subject_id, scope)
 );
 
 -- ───────────────────────────── Connections ─────────────────────────────
@@ -242,5 +245,8 @@ create table audit_log (
   request_id      text,
   ip              inet
 );
--- Append-only: revoke update/delete from the application role.
--- revoke update, delete on audit_log from bancha_app;
+-- Append-only by convention: the server only inserts. To enforce it, run the server as a role other than the owner
+-- and revoke update, delete on audit_log from it.
+
+-- Seed: the directory for people and groups made in Bancha itself (until Entra sync, 1.5).
+insert into directories (name, type) values ('local', 'local');

@@ -726,15 +726,17 @@ const LIVE = { on:false, at:'' };   // true once server/server.js answers with r
 // arak: the server checks the password with Arak and only lets Arak platform admins in.
 const AUTH = { mode: location.protocol === 'file:' ? 'sample' : 'pending' };
 const IDN = { on:false, at:'', sources:{}, people:[] };   // live users of Arak and OpenMetadata, matched by email (api/identity)
-const PAGES_ORDER = ['myapps','overview','identity','connections','apps','sync'];
+// Users, groups and role bindings in Bancha's own database (api/v1/admin). on: the database is ready; the console uses it instead of the samples.
+const BDB = { on:false, at:'', users:[], groups:[], apps:[], bindings:[], sync:null, detail:{} };
+const PAGES_ORDER =['myapps','overview','identity','connections','apps','sync'];
 const state = {
   page: null,
   session: null, handoff: null, menuOpen: false,
   bellOpen: false, bellNew: new Set(), readAtt: new Set((() => { try { return JSON.parse(sessionStorage.getItem('bancha-read') || '[]'); } catch { return []; } })()),
   login: { mode:'choose', target: null, user: '', err: '' },
   sub: { identity:'users', connections:'data_source', apps:'registry', sync:'deliveries' },
-  q: { users:'', groups:'', conns:'', dlv:'', audit:'', match:'' },
-  f: { uSrc:'all', uApp:'all', uStatus:'all', cType:'all', cStatus:'all', dApp:'all', dStatus:'all', mWho:'all' },
+  q: { users:'', groups:'', conns:'', dlv:'', audit:'', match:'', binds:'' },
+  f: { uSrc:'all', uApp:'all', uStatus:'all', cType:'all', cStatus:'all', dApp:'all', dStatus:'all', mWho:'all', bApp:'all' },
   layer: null, wiz: null,
 };
 try { const h = location.hash.slice(1); if (PAGES_ORDER.includes(h)) state.page = h; } catch {}
@@ -815,8 +817,10 @@ const DESC = {
   'App registry': 'Apps that plug into Bancha through contract v1: a manifest, three endpoints and client credentials. Register, suspend and remove them here.',
   'Delivery and audit': 'Every change goes out as an event with a sequence number. Follow each delivery, retry the ones that failed and see who changed what.',
 };
+const DESC_DB = 'One list of people and groups, kept in Bancha. Role bindings decide who can do what in each app. Azure AD and LDAP are not connected yet, so everyone here is a local account.';
 function pageHead({ eyebrow, title, meta, actions, seg }){
-  return `<div class="head"><div><h1>${esc(title)}</h1>${DESC[title] ? `<p class="desc">${esc(DESC[title])}</p>` : ''}<div class="meta">${meta.map(([k, v]) => `<span>${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div></div>
+  const d = title === 'Users & groups' && BDB.on ? DESC_DB : DESC[title];
+  return `<div class="head"><div><h1>${esc(title)}</h1>${d ? `<p class="desc">${esc(d)}</p>` : ''}<div class="meta">${meta.map(([k, v]) => `<span>${esc(k)} <b>${esc(v)}</b></span>`).join('')}</div></div>
   <div class="actions">${actions || ''}</div></div>${seg || ''}`;
 }
 function seg(page, items){
@@ -872,7 +876,7 @@ function topbar(){
   return `<header class="topbar">
     ${admin ? `<label class="tsearch" for="gsearch">${ic('search')}<input id="gsearch" placeholder="Search users, groups and email" autocomplete="off" aria-label="Search users and groups"></label>` : ''}
     <span class="grow"></span>
-    ${LIVE.on && (state.page === 'connections' || (state.page === 'identity' && state.sub.identity === 'match')) ? `<span class="sample live">Live · real ${state.page === 'identity' ? 'users' : 'connections'}</span>` : '<span class="sample">Prototype · sample data</span>'}
+    ${LIVE.on && (state.page === 'connections' || (state.page === 'identity' && (state.sub.identity === 'match' || BDB.on))) ? `<span class="sample live">Live · real ${state.page === 'identity' ? 'users' : 'connections'}</span>` : '<span class="sample">Prototype · sample data</span>'}
     ${admin ? `<div class="bellwrap"><button class="iconbtn" data-act="bell" aria-label="Notifications${n ? `, ${n} unread` : ''}" aria-expanded="${state.bellOpen}" title="Notifications">${ic('bell')}${n ? `<i>${n}</i>` : ''}</button>${state.bellOpen ? bellPanel(att) : ''}</div>` : ''}
     ${themeBtn('')}
     <div class="tme"><span class="avatar">${initials(u.name)}</span><div><b>${esc(u.name)}</b><small>${admin ? 'Platform admin' : 'Member'}</small></div></div>
@@ -1071,6 +1075,7 @@ function pIdentity(){
   if (sub === 'match') return pageHead({ eyebrow:'Identity', title:'Users & groups',
     meta:[['Arak', IDN.sources.arak?.ok ? fmt(IDN.sources.arak.users) + ' users' : 'not read'],['OpenMetadata', IDN.sources.openmetadata?.ok ? fmt(IDN.sources.openmetadata.users) + ' users' : 'not read'],['Last read','Today · ' + IDN.at]],
     actions: btn('refresh','Read again','idrefresh'), seg: seg('identity', tabs) }) + matchView();
+  if (BDB.on) return dbIdentity(sub, tabs);
   const head = pageHead({ eyebrow:'Identity', title:'Users & groups',
     meta:[['Directories','3'],['Users','1,284'],['Groups','46'],['Last sync','13 Oct 2026 · 22:10']],
     actions: btn('refresh','Sync directories','syncdirs') + btn('plus','Add local user','adduser','primary'),
@@ -1214,6 +1219,84 @@ function bindingsMatrix(){
       ${la.map(a => `<td class="r"><select id="mx-${gi}-${a.key}" data-bind="${gi}|${a.key}" class="${g.bind[a.key] ? '' : 'none'}" aria-label="${esc(a.name)} role for ${esc(g.name)}">
         <option value="">— No role</option>${a.roles.map(([rk, rn]) => `<option value="${rk}" ${g.bind[a.key] === rk ? 'selected' : ''}>${esc(rn)}</option>`).join('')}</select>${ic('chev','cv')}</td>`).join('')}</tr>`).join('')}
     </tbody></table></div></section>`;
+}
+
+/* ───────────── Users & groups from Bancha's database (api/v1/admin, when api/db is ready) ───────────── */
+const dbApp = k => BDB.apps.find(a => a.key === k);
+const dbRole = (k, r) => dbApp(k)?.roles.find(x => x.role === r)?.name || r;
+const dbRoleChip = b => appChip(b.app, `${dbApp(b.app)?.name || b.app} · ${dbRole(b.app, b.role)}${b.scope ? ' @ ' + b.scope : ''}`);
+// Roles a user holds: their own and their groups'.
+const dbAccess = u => [...BDB.bindings.filter(b => b.subjectType === 'user' && b.subjectId === u.id),
+  ...BDB.groups.filter(g => u.groups.includes(g.name)).flatMap(g => g.roles)];
+const dbStatus = s => s === 'active' ? pill('ok','Active') : s === 'deleted' ? pill('bad','Deleted') : pill('mute','Disabled');
+function dbSyncText(){
+  const s = BDB.sync, l = s && s.last;
+  if (!s || !s.enabled) return 'Off' + (s && s.reason ? ' · ' + s.reason : '');
+  if (s.running) return 'Sending now…';
+  if (!l) return 'Waiting';
+  return `${l.ok ? 'OK' : 'Failed'} · ${new Date(l.finishedAt).toTimeString().slice(0, 5)} · ${l.changes} change${l.changes === 1 ? '' : 's'}`;
+}
+function dbIdentity(sub, tabs){
+  const U = BDB.users, G = BDB.groups;
+  const action = sub === 'groups' ? btn('plus','New group','dbnewgroup','primary') : sub === 'bindings' ? btn('plus','Give a role','dbgrant','primary') : btn('plus','Add local user','dbnewuser','primary');
+  const head = pageHead({ eyebrow:'Identity', title:'Users & groups',
+    meta:[['Stored in','Bancha database'],['Users', fmt(U.length)],['Groups', fmt(G.length)],['Push to Arak', dbSyncText()]],
+    actions: btn('refresh','Reload','dbreload') + action, seg: seg('identity', tabs) });
+  const noAccess = U.filter(u => u.status === 'active' && !dbAccess(u).length).length;
+  const k = kpis([
+    { icon:'user', label:'Active users', value:fmt(U.filter(u => u.status === 'active').length), sub:'local accounts until a directory is connected' },
+    { icon:'pause', label:'Disabled', value:fmt(U.filter(u => u.status === 'disabled').length), sub:'kept, and disabled in Arak' },
+    { icon:'users', label:'Groups', value:fmt(G.length), sub:`${G.filter(g => g.roles.length).length} hold an app role` },
+    { icon:'shield', label:'Role bindings', value:fmt(BDB.bindings.length), sub:'to users and groups' },
+    { icon:'alert', label:'No app access', value:fmt(noAccess), sub:'active but hold no role', tone: noAccess ? 'warn' : '' },
+  ]);
+  const s = BDB.sync, failed = s && s.last && !s.last.ok;
+  const banner = `<div class="banner ${failed ? 'warn' : 'info'}">${ic(failed ? 'alert' : 'check')}<div><b>Live.</b> Users, groups and roles are stored in Bancha's database.
+    Arak gets the users and groups that hold an Arak role a few seconds after each change, and again every night. OpenMetadata and Prajak are not connected yet.
+    ${failed ? ` Last push to Arak failed: ${esc(s.last.error || 'see the pm2 log')}. Bancha tries again in 10 minutes.` : ''}</div></div>`;
+  return head + banner + k + (sub === 'groups' ? dbGroupsTable() : sub === 'bindings' ? dbBindingsTable() : dbUsersTable());
+}
+function dbUsersTable(){
+  const la = BDB.apps;
+  const rows = BDB.users.filter(u => match(state.q.users, u.displayName, u.username, u.email, u.department, u.groups.join(' '))
+    && (state.f.uStatus === 'all' || u.status === state.f.uStatus)
+    && (state.f.uApp === 'all' || (state.f.uApp === 'none' ? !dbAccess(u).length : dbAccess(u).some(b => b.app === state.f.uApp))));
+  return `<section class="card"><div class="filters">${search('q-users','users','Search name, username, email, group')}
+    ${fsel('f-uapp','App access','uApp',[['all','All'], ...la.map(a => [a.key, a.name]), ['none','No access']])}
+    ${fsel('f-ustatus','Status','uStatus',[['all','All'],['active','Active'],['disabled','Disabled']])}
+    <span class="spacer"></span><span class="count">${rows.length} users</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>User</th><th>Directory</th><th>Groups</th><th>App access</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(u => { const acc = dbAccess(u); return `<tr data-act="dbuser" data-id="${esc(u.id)}" tabindex="0">
+      <td><div class="cell-title">${esc(u.displayName)}</div><div class="cell-sub">${esc(u.email || u.username)}</div></td>
+      <td>${src(u.directory === 'local' ? 'Local' : u.directory)}<div class="cell-sub">${esc(u.department || '')}</div></td>
+      <td><div class="chips">${u.groups.slice(0, 2).map(g => `<span class="chip">${esc(g)}</span>`).join('')}${u.groups.length > 2 ? `<span class="chip more">+${u.groups.length - 2}</span>` : ''}${u.groups.length ? '' : '<span class="t-mute">—</span>'}</div></td>
+      <td><div class="chips">${acc.slice(0, 3).map(dbRoleChip).join('')}${acc.length > 3 ? `<span class="chip more">+${acc.length - 3}</span>` : ''}${acc.length ? '' : '<span class="t-mute">No access</span>'}</div></td>
+      <td>${dbStatus(u.status)}</td></tr>`; }).join('') || `<tr><td colspan="5" class="empty">${BDB.users.length ? 'No users match these filters.' : 'No users yet. Use “Add local user”.'}</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>Showing ${rows.length} of ${BDB.users.length} · Bancha database</span><span>Deleted users are kept but not listed</span></div></section>`;
+}
+function dbGroupsTable(){
+  const rows = BDB.groups.filter(g => match(state.q.groups, g.name, g.description));
+  return `<section class="card"><div class="filters">${search('q-groups','groups','Search group')}<span class="spacer"></span><span class="count">${rows.length} groups</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Group</th><th>Directory</th><th>Members</th><th>App roles</th></tr></thead><tbody>
+    ${rows.map(g => `<tr data-act="dbgroup" data-id="${esc(g.id)}" tabindex="0"><td><div class="cell-title">${esc(g.name)}</div><div class="cell-sub">${esc(g.description || '')}</div></td>
+      <td>${src(g.directory === 'local' ? 'Local' : g.directory)}</td><td class="num">${fmt(g.members)}</td>
+      <td><div class="chips">${g.roles.map(dbRoleChip).join('') || '<span class="t-mute">None</span>'}</div></td></tr>`).join('')
+      || `<tr><td colspan="4" class="empty">${BDB.groups.length ? 'No groups match.' : 'No groups yet. Use “New group”.'}</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>Showing ${rows.length} of ${BDB.groups.length} · Bancha database</span><span>A group's roles go to each of its members</span></div></section>`;
+}
+function dbBindingsTable(){
+  const rows = BDB.bindings.filter(b => (state.f.bApp === 'all' || b.app === state.f.bApp) && match(state.q.binds, b.subjectName, b.subjectEmail, b.role, b.scope));
+  return `<section class="card"><div class="card-h"><h2>Who holds which app role</h2><p>Each app defines its roles in its manifest. Bancha decides who holds them, and takes back only what it gave.</p></div>
+    <div class="filters">${search('q-binds','binds','Search person, group, role, scope')}${fsel('f-bapp','App','bApp',[['all','All'], ...BDB.apps.map(a => [a.key, a.name])])}
+    <span class="spacer"></span><span class="count">${rows.length} bindings</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>App · role</th><th>Scope</th><th>Given to</th><th>Since</th><th></th></tr></thead><tbody>
+    ${rows.map(b => { const a = dbApp(b.app); return `<tr><td>${dbRoleChip({ ...b, scope:null })}${b.orphaned ? ' ' + pill('warn','No longer in manifest') : ''}${a && a.status !== 'active' ? `<div class="cell-sub">${esc(a.name)} is not connected yet. Stored, not sent</div>` : ''}</td>
+      <td>${b.scope ? `<span class="mono">${esc(b.scope)}</span>` : '<span class="t-mute">—</span>'}</td>
+      <td><div class="cell-title">${esc(b.subjectName || '—')}${b.subjectStatus && b.subjectStatus !== 'active' ? ' ' + dbStatus(b.subjectStatus) : ''}</div><div class="cell-sub">${b.subjectType === 'group' ? 'Group' : esc(b.subjectEmail || 'User')}</div></td>
+      <td class="num t-mute">${esc(new Date(b.grantedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }))}</td>
+      <td class="r">${btn('', 'Take back', 'dbrevoke', 'sm ghost danger', `data-id="${esc(b.id)}"`)}</td></tr>`; }).join('')
+      || `<tr><td colspan="5" class="empty">${BDB.bindings.length ? 'No bindings match.' : 'Nobody holds an app role yet. Use “Give a role”.'}</td></tr>`}
+    </tbody></table></div><div class="tbl-foot"><span>${rows.length} of ${BDB.bindings.length} · Bancha database</span><span>A role set in Arak by hand stays when Bancha takes back its own</span></div></section>`;
 }
 
 /* ───────────── Connections ───────────── */
@@ -1454,6 +1537,108 @@ function userDrawer(id){
       <div class="cell-sub" style="margin-top:6px">Each app receives only the attributes its manifest asked for and an admin approved.</div></div></div>`,
     `${u.src === 'Local' ? btn('pause','Disable user','toast','danger','data-msg="Local user disabled · user.disabled queued"') : '<span class="grow t-mute" style="align-self:center;font-size:14px">Managed in ' + esc(u.src) + '. Edit the user there.</span>'}${btn('refresh','Resend to apps','resenduser','', 'data-id="' + u.user + '"')}`);
 }
+// One user or group from api/v1/admin, fetched when its drawer opens. null while loading.
+function dbDetail(kind, id){
+  const key = kind + ':' + id;
+  if (!(key in BDB.detail)) {
+    BDB.detail[key] = null;
+    api(`api/v1/admin/${kind}/${encodeURIComponent(id)}`).then(async r => { const x = await r.json().catch(() => ({}));
+      BDB.detail[key] = r.ok ? x : { error: x.error || 'HTTP ' + r.status }; renderLayer(); })
+      .catch(e => { BDB.detail[key] = { error: e.message }; renderLayer(); });
+  }
+  return BDB.detail[key];
+}
+// Form values survive a redraw (an error, or another field changing): renderLayer keeps them in state.layer.form.
+const fv = (id, dflt = '') => esc(state.layer.form?.[id] ?? dflt ?? '');
+const dbErr = () => state.layer.err ? `<div class="banner bad" role="alert" style="margin:0 0 16px">${ic('alert')}<div>${esc(state.layer.err)}</div></div>` : '';
+const dbWait = t => drawer(t, '', '<div class="empty">Loading…</div>');
+const dbRolesBox = (roles, give, viaCol) => `<div class="box"><table><thead><tr><th>App · role</th><th>Scope</th>${viaCol ? '<th>Via</th>' : ''}<th></th></tr></thead><tbody>
+  ${roles.map(r => `<tr><td>${dbRoleChip({ ...r, scope:null })}</td><td>${r.scope ? `<span class="mono">${esc(r.scope)}</span>` : '<span class="t-mute">—</span>'}</td>
+    ${viaCol ? `<td class="t-mute">${r.via ? 'Group ' + esc(r.via) : 'Given directly'}</td>` : ''}<td class="r">${r.via ? '' : btn('', 'Take back', 'dbrevoke', 'sm ghost danger', `data-id="${esc(r.id)}"`)}</td></tr>`).join('')
+    || `<tr><td colspan="${viaCol ? 4 : 3}" class="t-mute">No app roles</td></tr>`}
+  </tbody></table>${give ? `<div style="padding-top:10px">${give}</div>` : ''}</div>`;
+function dbUserDrawer(id){
+  const u = dbDetail('users', id);
+  if (!u) return dbWait('User');
+  if (u.error) return drawer('User', '', `<div class="err">${esc(u.error)}</div>`);
+  const local = u.directoryType === 'local', del = u.status === 'deleted';
+  const join = BDB.groups.filter(g => !u.groups.some(x => x.id === g.id));
+  const fld = (fid, label, v, extra = '') => `<label class="field"><span>${label}</span><input class="inp" id="${fid}" value="${fv(fid, v)}" autocomplete="off" ${extra}></label>`;
+  return drawer(u.displayName, esc(u.email || u.username), `${dbErr()}
+    <div class="sec"><h3>Profile</h3><div class="box"><dl class="kv">
+      <dt>Username</dt><dd class="mono">${esc(u.username)}</dd><dt>Directory</dt><dd>${src(local ? 'Local' : u.directory)}</dd>
+      <dt>Status</dt><dd>${dbStatus(u.status)}</dd><dt>Bancha id</dt><dd class="mono">${esc(u.id)}</dd><dt>Version</dt><dd class="num">v${u.version}</dd></dl></div></div>
+    ${del ? '' : `<div class="sec"><h3>Details</h3><form id="dbform-edituser" class="box" style="display:grid;gap:12px" novalidate>
+      ${fld('du-name', 'Display name', u.displayName, local ? '' : 'disabled')}
+      <div class="row2">${fld('du-email', 'Email', u.email, local ? 'type="email"' : 'disabled')}${fld('du-dept', 'Department', u.department)}</div>
+      <div class="row2">${fld('du-title', 'Job title', u.jobTitle)}${fld('du-emp', 'Employee id', u.employeeId)}</div>
+      <div><button class="btn sm" type="submit">${ic('check')}Save details</button></div></form></div>`}
+    <div class="sec"><h3>Groups</h3>
+      <div class="box">${u.groups.length ? `<table><tbody>${u.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="r">${del ? '' : btn('', 'Remove', 'dbleave', 'sm ghost danger', `data-g="${esc(g.id)}" data-u="${esc(u.id)}"`)}</td></tr>`).join('')}</tbody></table>` : '<span class="t-mute">Not in any group</span>'}
+      ${del || !join.length ? '' : `<div style="display:flex;gap:8px;padding-top:10px"><select class="inp" id="du-join" style="max-width:280px" aria-label="Group to join">${join.map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('')}</select>${btn('plus', 'Add to group', 'dbjoin', 'sm', `data-u="${esc(u.id)}"`)}</div>`}</div></div>
+    <div class="sec"><h3>App roles</h3>${dbRolesBox(u.roles, del ? '' : btn('plus', 'Give a role', 'dbgrant', 'sm', `data-type="user" data-id="${esc(u.id)}"`), true)}</div>`,
+    del ? '<span class="grow t-mute" style="align-self:center;font-size:14px">Deleted. The row is kept so history in each app still points to this user.</span>'
+      : local ? (u.status === 'active' ? btn('pause', 'Disable', 'dbstatus', 'danger', `data-id="${esc(u.id)}" data-to="disabled"`) : btn('check', 'Enable', 'dbstatus', '', `data-id="${esc(u.id)}" data-to="active"`)) + btn('x', 'Delete user', 'dbdeluser', 'danger', `data-id="${esc(u.id)}"`)
+      : `<span class="grow t-mute" style="align-self:center;font-size:14px">Name, email and status come from ${esc(u.directory)}. Change them there.</span>`);
+}
+function dbGroupDrawer(id){
+  const g = dbDetail('groups', id);
+  if (!g) return dbWait('Group');
+  if (g.error) return drawer('Group', '', `<div class="err">${esc(g.error)}</div>`);
+  const add = BDB.users.filter(u => u.status === 'active' && !g.members.some(m => m.id === u.id));
+  return drawer(g.name, esc(g.description || 'Group'), `${dbErr()}
+    <div class="sec"><h3>Description</h3><form id="dbform-editgroup" class="box" style="display:grid;gap:12px" novalidate>
+      <label class="field"><span>Description</span><input class="inp" id="dg-desc" value="${fv('dg-desc', g.description)}" autocomplete="off"><small>The name stays as it is: Arak finds the group by its name.</small></label>
+      <div><button class="btn sm" type="submit">${ic('check')}Save</button></div></form></div>
+    <div class="sec"><h3>Members · ${g.members.length}</h3><div class="box"><table><tbody>
+      ${g.members.map(m => `<tr><td><div class="cell-title">${esc(m.displayName)}</div><div class="cell-sub">${esc(m.email || m.username)}</div></td><td>${dbStatus(m.status)}</td>
+        <td class="r">${btn('', 'Remove', 'dbleave', 'sm ghost danger', `data-g="${esc(g.id)}" data-u="${esc(m.id)}"`)}</td></tr>`).join('') || '<tr><td class="t-mute">No members yet</td></tr>'}
+      </tbody></table>
+      ${add.length ? `<div style="display:flex;gap:8px;padding-top:10px"><select class="inp" id="dg-add" style="max-width:320px" aria-label="Person to add">${add.map(u => `<option value="${esc(u.id)}">${esc(u.displayName)} · ${esc(u.email || u.username)}</option>`).join('')}</select>${btn('plus', 'Add member', 'dbjoin', 'sm', `data-g="${esc(g.id)}"`)}</div>` : ''}</div></div>
+    <div class="sec"><h3>App roles</h3>${dbRolesBox(g.roles, btn('plus', 'Give a role', 'dbgrant', 'sm', `data-type="group" data-id="${esc(g.id)}"`), false)}
+      <div class="cell-sub" style="margin-top:6px">Each member gets these roles in the app. Removing someone from the group takes them back.</div></div>`,
+    btn('x', 'Delete group', 'dbdelgroup', 'danger', `data-id="${esc(g.id)}"`));
+}
+function dbNewUserDrawer(){
+  return drawer('Add local user', 'A local account in Bancha. Bancha keeps no password: people still sign in to each app as they do today.', `
+    <form id="dbform-newuser" class="d-b" style="padding:0" novalidate>
+      <div class="row2"><label class="field"><span>Username</span><input class="inp mono" id="nu-user" value="${fv('nu-user')}" placeholder="somchai.k" autocomplete="off"><small>Letters, digits and . _ @ -. Cannot change later</small></label>
+        <label class="field"><span>Display name</span><input class="inp" id="nu-name" value="${fv('nu-name')}" placeholder="Somchai K." autocomplete="off"></label></div>
+      <label class="field"><span>Email</span><input class="inp" id="nu-email" type="email" value="${fv('nu-email')}" placeholder="somchai.k@mfec.co.th" autocomplete="off"><small>Bancha finds this person's existing Arak account by email</small></label>
+      <div class="row2"><label class="field"><span>Department</span><input class="inp" id="nu-dept" value="${fv('nu-dept')}" autocomplete="off"></label>
+        <label class="field"><span>Job title</span><input class="inp" id="nu-title" value="${fv('nu-title')}" autocomplete="off"></label></div>
+      ${state.layer.err ? `<div class="err" role="alert">${esc(state.layer.err)}</div>` : ''}
+    </form>`, `${btn('', 'Cancel', 'close', 'ghost')}<button class="btn primary" type="submit" form="dbform-newuser">${ic('check')}Add user</button>`);
+}
+function dbNewGroupDrawer(){
+  return drawer('New group', 'Give the group app roles, then add people. Each member gets the group\'s roles.', `
+    <form id="dbform-newgroup" class="d-b" style="padding:0" novalidate>
+      <label class="field"><span>Name</span><input class="inp mono" id="ng-name" value="${fv('ng-name')}" placeholder="dg-finance-owners" autocomplete="off"><small>Cannot change later: Arak finds the group by its name</small></label>
+      <label class="field"><span>Description</span><input class="inp" id="ng-desc" value="${fv('ng-desc')}" autocomplete="off"></label>
+      ${state.layer.err ? `<div class="err" role="alert">${esc(state.layer.err)}</div>` : ''}
+    </form>`, `${btn('', 'Cancel', 'close', 'ghost')}<button class="btn primary" type="submit" form="dbform-newgroup">${ic('check')}Create group</button>`);
+}
+function dbGrantDrawer(){
+  const L = state.layer, f = L.form || {};
+  const apps = BDB.apps;
+  const a = dbApp(f['gr-app']) || apps.find(x => x.status === 'active') || apps[0];
+  const roles = a ? a.roles.filter(r => !r.orphaned) : [];
+  const role = roles.find(r => r.role === f['gr-role']) || roles.find(r => r.default) || roles[0];
+  const fixed = !!L.subjectId, type = fixed ? L.subjectType : (f['gr-type'] || 'group');
+  const list = type === 'user' ? BDB.users.filter(u => u.status !== 'deleted').map(u => [u.id, `${u.displayName} · ${u.email || u.username}`]) : BDB.groups.map(g => [g.id, g.name]);
+  const who = fixed && (L.subjectType === 'user' ? BDB.users.find(u => u.id === L.subjectId)?.displayName : BDB.groups.find(g => g.id === L.subjectId)?.name);
+  const opt = (v, t, sel) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(t)}</option>`;
+  return drawer('Give a role', fixed ? 'To ' + esc(who || '') : 'To one person, or to a group so each member gets it.', `
+    <form id="dbform-grant" class="d-b" style="padding:0" novalidate>
+      <div class="row2"><label class="field"><span>App</span><select class="inp" id="gr-app" data-dbg>${apps.map(x => opt(x.key, x.name + (x.status === 'active' ? '' : ' · not connected yet'), a?.key)).join('')}</select></label>
+        <label class="field"><span>Role</span><select class="inp" id="gr-role" data-dbg>${roles.map(r => opt(r.role, r.name, role?.role)).join('')}</select></label></div>
+      ${role?.scoped ? `<label class="field"><span>Scope</span><input class="inp mono" id="gr-scope" value="${fv('gr-scope')}" placeholder="service.database.schema.table" autocomplete="off"><small>This role holds for one data asset, named by its OpenMetadata fully qualified name</small></label>` : ''}
+      ${fixed ? '' : `<div class="row2"><label class="field"><span>Give to</span><select class="inp" id="gr-type" data-dbg>${opt('group', 'A group', type)}${opt('user', 'One person', type)}</select></label>
+        <label class="field"><span>${type === 'user' ? 'Person' : 'Group'}</span><select class="inp" id="gr-subj">${list.map(([v, t]) => opt(v, t, f['gr-subj'])).join('') || '<option value="">None yet</option>'}</select></label></div>`}
+      ${a && a.status !== 'active' ? `<div class="banner warn" style="margin:0">${ic('alert')}<div>${esc(a.name)} is not connected yet. Bancha keeps the role and sends it once ${esc(a.name)} is connected.</div></div>` : ''}
+      ${L.err ? `<div class="err" role="alert">${esc(L.err)}</div>` : ''}
+    </form>`, `${btn('', 'Cancel', 'close', 'ghost')}<button class="btn primary" type="submit" form="dbform-grant">${ic('check')}Give role</button>`);
+}
 function liveSection(c){
   const i = c.info;
   const miss = c.missing.length ? `<div class="banner warn" style="margin:0 0 12px">${ic('key')}<div><b>Needs credentials.</b> Put these in <span class="mono">.env</span> on the Bancha host, then test again:
@@ -1663,6 +1848,12 @@ function renderLayer(){
   if (!L) { $('#layer').innerHTML = ''; return; }
   const a = document.activeElement, aid = a && a.id;
   const scroll = $('#layer .d-b') ? $('#layer .d-b').scrollTop : 0;
+  if (L.drawn && L.kind.startsWith('db')) { L.form = L.form || {}; document.querySelectorAll('#layer input[id], #layer select[id]').forEach(x => { L.form[x.id] = x.value; }); }
+  if (L.kind === 'dbuser') html = dbUserDrawer(L.id);
+  if (L.kind === 'dbgroup') html = dbGroupDrawer(L.id);
+  if (L.kind === 'dbnewuser') html = dbNewUserDrawer();
+  if (L.kind === 'dbnewgroup') html = dbNewGroupDrawer();
+  if (L.kind === 'dbgrant') html = dbGrantDrawer();
   if (L.kind === 'user') html = userDrawer(L.id);
   if (L.kind === 'xuser') html = xuserDrawer(L.id);
   if (L.kind === 'conn') html = connDrawer(L.id);
@@ -1677,6 +1868,7 @@ function renderLayer(){
   const b = $('#layer .d-b'); if (b) b.scrollTop = scroll;
   const keep = aid && document.getElementById(aid);
   if (keep) keep.focus({ preventScroll:true }); else { const f = $('#layer .x'); if (f && !L.opened) { f.focus(); L.opened = true; } }
+  L.drawn = true;
 }
 function openLayer(kind, id){ state.layer = { kind, id }; renderLayer(); }
 function closeLayer(){ state.layer = null; state.wiz = null; if (wzTimer) { clearInterval(wzTimer); wzTimer = null; } $('#layer').innerHTML = ''; }
@@ -1697,6 +1889,23 @@ const ACT = {
     render();
   },
   sub: d => { state.sub[d.page] = d.id; render(); },
+  dbreload: async () => { await dbRefresh(); toast('Reloaded', 'From the Bancha database'); },
+  dbuser: d => openLayer('dbuser', d.id),
+  dbgroup: d => openLayer('dbgroup', d.id),
+  dbnewuser: () => openLayer('dbnewuser'),
+  dbnewgroup: () => openLayer('dbnewgroup'),
+  // From a user or group drawer the subject is fixed, and the drawer comes back after the role is given.
+  dbgrant: d => { const L = state.layer, back = L && ['dbuser','dbgroup'].includes(L.kind) ? { kind:L.kind, id:L.id } : null;
+    state.layer = { kind:'dbgrant', subjectType:d.type, subjectId:d.type ? d.id : undefined, back }; renderLayer(); },
+  dbrevoke: d => dbAct(() => dbWrite('DELETE', 'role-bindings/' + d.id), 'Role taken back'),
+  dbleave: d => dbAct(() => dbWrite('DELETE', `groups/${d.g}/members/${d.u}`), 'Removed from the group'),
+  dbjoin: d => { const g = d.g || $('#du-join')?.value, u = d.u || $('#dg-add')?.value;
+    if (g && u) dbAct(() => dbWrite('POST', `groups/${g}/members`, { userId:u }), 'Added to the group'); },
+  dbstatus: d => dbAct(() => dbWrite('PATCH', 'users/' + d.id, { status:d.to }), d.to === 'disabled' ? 'User disabled' : 'User enabled'),
+  dbdeluser: d => { if (confirm('Delete this user? They are disabled in every app, and this cannot be undone. The record is kept for history.'))
+    dbAct(() => dbWrite('DELETE', 'users/' + d.id), 'User deleted'); },
+  dbdelgroup: d => { if (confirm('Delete this group? Its members lose the roles the group gave them.'))
+    dbAct(() => dbWrite('DELETE', 'groups/' + d.id), 'Group deleted', closeLayer); },
   idrefresh: async () => { toast('Reading users again', 'From Arak and OpenMetadata, read-only'); await loadIdentity(true); toast('Users read again', `${IDN.people.length} people across both apps`); },
   theme: () => { const root = document.documentElement; root.dataset.theme = isDark() ? 'light' : 'dark'; try { localStorage.setItem('bancha-theme', root.dataset.theme); } catch {} render(); },
   menu: () => { state.menuOpen = !state.menuOpen; render(); },
@@ -1810,6 +2019,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.f) { state.f[t.dataset.f] = t.value; render(); }
+  if (t.dataset.dbg !== undefined) renderLayer();
   if (t.dataset.bind) { const [gi, ak] = t.dataset.bind.split('|'); const g = GROUPS[gi]; const before = g.bind[ak];
     if (t.value) g.bind[ak] = t.value; else delete g.bind[ak];
     audit(t.value ? 'rolebinding.grant' : 'rolebinding.revoke', `${ak}/${t.value || before}`, `Group ${g.name}`);
@@ -1828,6 +2038,7 @@ document.addEventListener('change', e => {
   if (t.dataset.un) t.dispatchEvent(new Event('input', { bubbles:true }));
 });
 document.addEventListener('submit', e => {
+  if (e.target.id.startsWith('dbform-')) { e.preventDefault(); dbSubmit(e.target); return; }
   if (e.target.id === 'loginform') { e.preventDefault();
     const L = state.login, id = $('#lg-user').value.trim().toLowerCase(), pw = $('#lg-pass').value; L.user = id;
     const fail = m => { L.err = m; render(); };
@@ -1880,7 +2091,81 @@ async function api(url, opts){
 async function loadLive(){
   if (location.protocol === 'file:' || (AUTH.mode === 'arak' && !state.session)) return;
   try { const r = await api('api/connections'); if (!r.ok) return;
-    const d = await r.json(); if (!d.live) return; applyLive(d.connections); render(); renderLayer(); loadIdentity(); } catch {}
+    const d = await r.json(); if (!d.live) return; applyLive(d.connections); render(); renderLayer(); loadIdentity(); loadDb(); } catch {}
+}
+
+/* ───────────── Bancha database (api/db, api/v1/admin) ───────────── */
+async function loadDb(){
+  try { const r = await api('api/db'); if (!r.ok) return; if ((await r.json()).ready) await dbRefresh(); } catch {}
+}
+async function dbGet(path){
+  const r = await api('api/v1/admin/' + path); const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status); return d;
+}
+async function dbRefresh(){
+  const [users, groups, apps, bindings] = await Promise.all(['users', 'groups', 'apps', 'role-bindings'].map(dbGet));
+  Object.assign(BDB, { on:true, users, groups, apps, bindings, detail:{}, at:new Date().toTimeString().slice(0, 5) });
+  try { BDB.sync = await (await api('api/arak-sync')).json(); } catch {}
+  render(); renderLayer();
+}
+async function dbWrite(method, path, body){
+  const r = await api('api/v1/admin/' + path, { method, headers: body ? { 'content-type':'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status); return d;
+}
+// After a change: follow the push to Arak it starts (arak-sync waits 3 s for more changes) and say how it went.
+let syncPoll = null;
+function dbWatchSync(){
+  clearTimeout(syncPoll);
+  const before = BDB.sync?.last?.finishedAt; let n = 0;
+  const tick = async () => {
+    try { BDB.sync = await (await api('api/arak-sync')).json(); } catch { return; }
+    const l = BDB.sync.last;
+    if (!BDB.sync.running && l && l.finishedAt !== before && l.trigger.startsWith('change: db')) {
+      if (state.page === 'identity') render();
+      return l.ok ? toast('Arak is up to date', `${l.changes} change${l.changes === 1 ? '' : 's'} sent as bancha-sync`) : toast('Push to Arak failed', esc(l.error || 'See the pm2 log') + '. Bancha tries again in 10 minutes.');
+    }
+    if (state.page === 'identity') render();
+    if (++n < 30) syncPoll = setTimeout(tick, 2000);
+  };
+  if (BDB.sync?.enabled) syncPoll = setTimeout(tick, 3500);
+}
+async function dbAct(fn, msg, after){
+  try { await fn(); if (state.layer) state.layer.err = ''; if (after) after(); await dbRefresh(); toast(esc(msg), 'Saved in Bancha'); dbWatchSync(); }
+  catch (e) { if (state.layer) { state.layer.err = e.message; renderLayer(); } else toast('Could not save', esc(e.message)); }
+}
+async function dbSubmit(form){
+  const L = state.layer, kind = form.id.slice(7), v = id => ($('#' + id)?.value || '').trim();
+  const go = form.querySelector('button[type=submit]') || document.querySelector(`button[form="${form.id}"]`); if (go) go.disabled = true;
+  try {
+    if (kind === 'newuser') {
+      const u = await dbWrite('POST', 'users', { username:v('nu-user'), displayName:v('nu-name'), email:v('nu-email'), department:v('nu-dept'), jobTitle:v('nu-title') });
+      state.sub.identity = 'users'; await dbRefresh(); openLayer('dbuser', u.id);
+      toast(`${esc(u.displayName)} added`, 'Give a role or add to a group so the user can use an app'); dbWatchSync(); return;
+    }
+    if (kind === 'newgroup') {
+      const g = await dbWrite('POST', 'groups', { name:v('ng-name'), description:v('ng-desc') });
+      state.sub.identity = 'groups'; await dbRefresh(); openLayer('dbgroup', g.id);
+      toast(`Group ${esc(g.name)} created`, 'Give it app roles, then add members'); return;
+    }
+    if (kind === 'grant') {
+      const b = await dbWrite('POST', 'role-bindings', { app:v('gr-app'), role:v('gr-role'), scope:v('gr-scope') || undefined,
+        subjectType: L.subjectType || v('gr-type'), subjectId: L.subjectId || v('gr-subj') });
+      await dbRefresh(); if (L.back) openLayer(L.back.kind, L.back.id); else closeLayer();
+      toast(`${esc(dbRole(b.app, b.role))} given to ${esc(b.subjectName)}`, dbApp(b.app)?.status === 'active' ? 'Saved in Bancha' : `${esc(dbApp(b.app)?.name || b.app)} is not connected yet, so nothing is sent`);
+      dbWatchSync(); return;
+    }
+    if (kind === 'edituser' || kind === 'editgroup') {
+      const cur = BDB.detail[(kind === 'edituser' ? 'users:' : 'groups:') + L.id] || {};
+      const fields = kind === 'edituser' ? { displayName:'du-name', email:'du-email', department:'du-dept', jobTitle:'du-title', employeeId:'du-emp' } : { description:'dg-desc' };
+      const body = {};
+      for (const [k, id] of Object.entries(fields)) if (!$('#' + id)?.disabled && v(id) !== (cur[k] || '')) body[k] = v(id);
+      if (!Object.keys(body).length) { toast('Nothing changed'); return; }
+      await dbAct(() => dbWrite('PATCH', (kind === 'edituser' ? 'users/' : 'groups/') + L.id, body), 'Saved');
+      return;
+    }
+  } catch (e) { L.err = e.message; renderLayer(); }
+  finally { if (go) go.disabled = false; }
 }
 async function loadIdentity(again){
   try { const r = await api('api/identity' + (again ? '?refresh' : '')); if (!r.ok) return;

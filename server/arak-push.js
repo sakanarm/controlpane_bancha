@@ -6,6 +6,8 @@
 //   node server/arak-push.js <desired.json>           show what would change, change nothing
 //   node server/arak-push.js <desired.json> --apply   make the changes, then read Arak back and compare
 //   node server/arak-push.js <desired.json> --undo    take back what the file gives and disable the users it created
+//   ... | node server/arak-push.js - --apply           read the desired JSON from stdin (server/arak-sync.js does this,
+//                                                      so users from the Bancha DB never land in a file)
 //
 // Env: ARAK_URL (for example http://127.0.0.1:8090/api), and ARAK_TOKEN or ARAK_USER + ARAK_PASSWORD.
 //
@@ -20,23 +22,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const MANIFEST = path.join(__dirname, '..', 'contracts', 'examples', 'arak.bancha-app.yaml');
+const { roleMap: manifestRoleMap } = require('./manifests');
 // Bancha fields Arak stores as principal_attribute rows. Other keys (clearance, tenant, ...) belong to Arak and are never touched.
 const ATTRS = ['department', 'employeeType', 'country'];
-
-// Role key -> Arak value, from the roles list in the manifest. Tiny reader: the manifest is ours and the list is flat.
-function manifestRoles(file) {
-  const roles = {}; let cur = null, inRoles = false;
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    if (/^  roles:\s*$/.test(line)) { inRoles = true; continue; }
-    if (inRoles && /^  \S/.test(line)) break;
-    if (!inRoles) continue;
-    let m;
-    if ((m = line.match(/^    - key:\s*(\S+)/))) cur = roles[m[1]] = { key: m[1] };
-    else if (cur && (m = line.match(/^      (appValue|scoped):\s*([^#\s]+)/))) cur[m[1]] = m[2] === 'true' ? true : m[2];
-  }
-  return roles;
-}
 
 const BASE = (process.env.ARAK_URL || 'http://127.0.0.1:8090/api').replace(/\/$/, '');
 let token = process.env.ARAK_TOKEN || '';
@@ -73,8 +61,8 @@ async function find(type, item) {
 async function main() {
   const [file, mode = '--plan'] = process.argv.slice(2);
   if (!file || !['--plan', '--apply', '--undo'].includes(mode)) { console.error('usage: node server/arak-push.js <desired.json> [--apply|--undo]'); process.exit(2); }
-  const want = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const roleMap = manifestRoles(MANIFEST);
+  const want = JSON.parse(fs.readFileSync(file === '-' ? 0 : file, 'utf8'));
+  const roleMap = manifestRoleMap('arak');
   const reason = want.reason || 'Bancha central config';
   const apply = mode !== '--plan', undo = mode === '--undo';
   await signIn();
@@ -88,21 +76,25 @@ async function main() {
   for (const g of want.groups || []) {
     const p = await find('GROUP', g);
     if (p) groupIds[g.name] = p.id;
-    else if (!undo) step(`create local group ${g.name}`, async () => {
+    else if (!undo && !g.leaveOnly) step(`create local group ${g.name}`, async () => {
       const r = await call('POST', '/v1/principals', { username: g.name, displayName: g.displayName || g.name, principalType: 'GROUP' });
       groupIds[g.name] = r.principal.id;
     });
   }
 
+  const toArak = r => {
+    const m = roleMap[r.role]; if (!m) throw new Error(`role ${r.role} is not in the Arak manifest`);
+    if (m.scoped && !r.scope) throw new Error(`${r.role} needs a scope`);
+    return { appRole: m.appValue, scopeFqn: m.scoped ? r.scope : null };
+  };
   for (const u of want.users || []) {
-    const desiredRoles = (u.roles || []).map(r => {
-      const m = roleMap[r.role]; if (!m) throw new Error(`role ${r.role} is not in the Arak manifest`);
-      if (m.scoped && !r.scope) throw new Error(`${r.role} needs a scope`);
-      return { appRole: m.appValue, scopeFqn: m.scoped ? r.scope : null };
-    });
+    const desiredRoles = (u.roles || []).map(toArak);
+    // revoke / leave: what Bancha gave before and no longer wants (server/arak-desired.js). A role still wanted stays.
+    const revokeRoles = (u.revoke || []).map(toArak);
     let p = await find('USER', u);
     const label = `${u.username} <${u.email}>`;
     if (!p && undo) { console.log(`${label}: not in Arak, nothing to undo`); continue; }
+    if (!p && (u.status || 'active') !== 'active') { console.log(`${label}: ${u.status} and not in Arak, nothing to do`); continue; }
     if (!p) {
       step(`create local user ${label} (no password: signs in with Microsoft by email)`, async () => {
         p = (await call('POST', '/v1/principals', { username: u.username, displayName: u.displayName, email: u.email, principalType: 'USER' })).principal;
@@ -126,6 +118,8 @@ async function main() {
     }
 
     if (p && !local) console.log(`${label}: found as ${p.source} ${p.username}; Bancha links to it and leaves its username, status and groups to ${p.source}`);
+    for (const r of revokeRoles.filter(r => held.some(h => same(h, r)) && !desiredRoles.some(d => same(d, r))))
+      step(`${label}: revoke ${r.appRole}${r.scopeFqn ? ' @ ' + r.scopeFqn : ''} (no longer given in Bancha)`, () => call('DELETE', `/v1/principals/${id()}/roles` + q({ role: r.appRole, ...(r.scopeFqn ? { scope: r.scopeFqn } : {}), reason })));
     for (const r of desiredRoles.filter(r => !held.some(h => same(h, r))))
       step(`${label}: grant ${r.appRole}${r.scopeFqn ? ' @ ' + r.scopeFqn : ''}`, () => call('POST', `/v1/principals/${id()}/roles`, { ...r, reason }));
     for (const key of ATTRS.filter(k => u[k])) {
@@ -139,6 +133,8 @@ async function main() {
         if (!(want.groups || []).some(g => g.name === name)) throw new Error(`group ${name} is not in the groups list`);
         step(`${label}: join group ${name}`, () => call('POST', `/v1/principals/${groupIds[name]}/members`, { memberId: id(), reason }));
       }
+      for (const g of detail.groups.filter(g => (u.leave || []).includes(g.username) && !(u.groups || []).includes(g.username)))
+        step(`${label}: leave group ${g.username} (no longer a member in Bancha)`, () => call('DELETE', `/v1/principals/${g.id}/members/${id()}` + q({ reason })));
       const enabled = (u.status || 'active') === 'active';
       if (p && p.enabled !== enabled) step(`${label}: ${enabled ? 'enable' : 'disable'}`, () => call('POST', `/v1/principals/${id()}/enabled`, { enabled, reason }));
     }
@@ -248,7 +244,9 @@ async function verify(want, roleMap, undo) {
   console.log('\nArak now holds:');
   const grants = (await call('GET', '/v1/principals/roles')).grants;
   for (const u of want.users || []) {
-    const p = await find('USER', u); if (!p) { console.log(`  ${u.username}: missing`); continue; }
+    const p = await find('USER', u);
+    if (!p && (undo || (u.status || 'active') !== 'active')) continue;
+    if (!p) { console.log(`  ${u.username}: missing`); continue; }
     const d = await call('GET', '/v1/principals/' + p.id);
     const roles = grants.filter(g => g.principalId === p.id).map(g => g.appRole + (g.scopeFqn ? ' @ ' + g.scopeFqn : ''));
     const attrs = d.attributes.filter(a => ATTRS.includes(a.key)).map(a => `${a.key}=${a.value} (${a.source})`);
@@ -257,7 +255,10 @@ async function verify(want, roleMap, undo) {
     console.log(`    attrs:  ${attrs.join(', ') || '-'}`);
     console.log(`    groups: ${d.groups.map(g => g.username).join(', ') || '-'}`);
     const wantRoles = undo ? [] : (u.roles || []).map(r => roleMap[r.role].appValue + (r.scope ? ' @ ' + r.scope : ''));
-    const ok = wantRoles.every(r => roles.includes(r)) && (!undo || roles.length === 0)
+    const gone = undo ? [] : (u.revoke || []).filter(r => !(u.roles || []).some(w => w.role === r.role && (w.scope || null) === (r.scope || null)))
+      .map(r => roleMap[r.role].appValue + (r.scope ? ' @ ' + r.scope : ''));
+    const ok = wantRoles.every(r => roles.includes(r)) && (!undo || roles.length === 0) && gone.every(r => !roles.includes(r))
+      && (p.source !== 'local' || (u.leave || []).every(n => !d.groups.some(g => g.username === n)))
       && ATTRS.every(k => !u[k] || undo !== d.attributes.some(a => a.key === k && a.value === u[k] && a.source === 'local'))
       && (u.groups || []).every(n => undo !== d.groups.some(g => g.username === n));
     console.log(`    ${ok ? 'MATCHES the file' : 'DOES NOT MATCH the file'}`);
